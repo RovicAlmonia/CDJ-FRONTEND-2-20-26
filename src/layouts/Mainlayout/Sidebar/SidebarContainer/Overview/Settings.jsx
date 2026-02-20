@@ -70,6 +70,10 @@ export default function Administrative() {
     navigate("/dashboard/clients");
   };
 
+  const navigateSOA = () => {
+    navigate("/dashboard/billing");
+  };
+
   const openMasterfileCollapseBtn = () => {
     setOpenMasterfile((prev) => !prev);
   };

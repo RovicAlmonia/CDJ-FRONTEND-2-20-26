@@ -12,6 +12,10 @@ const OverView = () => {
     navigate("/dashboard");
   };
 
+const navigateSOA = () => {       {/* ← ADD */}
+    navigate("/dashboard/billing");
+  };
+
   return (
     <>
       <CustomList>
@@ -24,8 +28,8 @@ const OverView = () => {
         />
         <ListItemButtonStyle
           ListbtnLabel="SOA Billing"
-          activePath="/dashboard"
-          MenuClick={navigateDashboard}
+          activePath="/dashboard/billing"
+          MenuClick={navigateSOA}
           IconChildrens={<DashboardIcon fontSize="small" />}
         />
         <Administrative />

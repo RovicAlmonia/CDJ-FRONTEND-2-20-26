@@ -27,6 +27,12 @@ const Clients = Loadable(
 const ServicesList = Loadable(
   lazy(() => import("../pages/servicesList/index"))
 );
+const TransactionList = Loadable(
+  lazy(() => import("../pages/transactions/index"))
+);
+const BillingList = Loadable(
+  lazy(() => import("../pages/billing/index"))
+);
 
 const DashboardRoutes = {
   path: "/",
@@ -47,6 +53,14 @@ const DashboardRoutes = {
     {
       path: "/dashboard/services-list",
       element: <ServicesList />,
+    },
+    {
+      path: "/dashboard/transactions",
+      element: <TransactionList />,
+    },
+    {
+      path: "/dashboard/billing",
+      element: <BillingList />,
     },
 
     // others
