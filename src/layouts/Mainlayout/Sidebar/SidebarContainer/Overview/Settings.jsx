@@ -307,7 +307,7 @@ export default function Administrative() {
         />
         <ListBtn
           label="History/Logs"
-          activePath="/dashboard/"
+          activePath="/dashboard/transactions"
           onClick={navigateMassEditEmployeeSalary}
         />
       </Collapsebtn>
