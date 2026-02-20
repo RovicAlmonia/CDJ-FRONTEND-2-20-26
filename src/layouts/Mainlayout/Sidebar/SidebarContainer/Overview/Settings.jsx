@@ -74,6 +74,10 @@ export default function Administrative() {
     navigate("/dashboard/billing");
   };
 
+  const navigatetransac = () => {
+    navigate("/dashboard/transactions");
+  };
+
   const openMasterfileCollapseBtn = () => {
     setOpenMasterfile((prev) => !prev);
   };
@@ -292,8 +296,8 @@ export default function Administrative() {
             />
             <CustomMenuButton
               label="History/Logs"
-              activePath="/dashboard/services-list"
-              onClick={navigateMassEditEmployeeSalary}
+              activePath="/dashboard/transactions"
+              onClick={navigatetransac}
             />
           </>
         }
@@ -307,8 +311,8 @@ export default function Administrative() {
         />
         <ListBtn
           label="History/Logs"
-          activePath="/dashboard/transactions"
-          onClick={navigateMassEditEmployeeSalary}
+          activePath="/dashboard/transactions/"
+          onClick={navigatetransac}
         />
       </Collapsebtn>
     </>
