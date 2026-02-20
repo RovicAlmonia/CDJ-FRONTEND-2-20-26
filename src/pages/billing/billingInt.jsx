@@ -199,6 +199,13 @@ export default function BillingInt() {
 
   const fmt = (val) => (val ? dayjs(val).format("YYYY-MM-DD") : null);
 
+  // ── Map billing payment status → transaction status ──
+  const resolveTransactionStatus = (paymentstatus) => {
+    if (paymentstatus === "Paid")    return "Paid";
+    if (paymentstatus === "Partial") return "Posted";
+    return "Active"; // Unpaid → keep as Active
+  };
+
   const handleSubmit = async () => {
     if (!form.clientid) {
       toast.error("Client ID is required.");
@@ -213,14 +220,42 @@ export default function BillingInt() {
       paymentdate: fmt(form.paymentdate),
     };
     try {
+      // 1. Save or update billing record
       if (isEdit) {
         await http.post("/updatebillinghdr", payload);
-        toast.success("Billing record updated!");
       } else {
         await http.post("/postbillinghdr", payload);
-        toast.success("Billing record saved!");
       }
+
+      // 2. Cascade status to all linked transactions
+      const txnStatus = resolveTransactionStatus(form.paymentstatus);
+      const clientTxns = transactionList.filter(
+        (t) => String(t.ClientID) === String(form.clientid)
+      );
+
+      await Promise.all(
+        clientTxns.map((txn) =>
+          http.post("/updatetransactionhdr", {
+            id: txn.ID,
+            transactiondate: txn.TransactionDate,
+            clientid: txn.ClientID,
+            particulars: txn.Particulars,
+            grosstotal: txn.GrossTotal,
+            discount: txn.Discount,
+            nettotal: txn.NetTotal,
+            status: txnStatus,
+          })
+        )
+      );
+
+      toast.success(
+        isEdit
+          ? `Billing updated. ${clientTxns.length} transaction(s) marked as "${txnStatus}".`
+          : `Billing saved. ${clientTxns.length} transaction(s) marked as "${txnStatus}".`
+      );
+
       queryClient.invalidateQueries("/selectbillinghdr");
+      queryClient.invalidateQueries("/selecttransactionhdr");
       handleClose();
     } catch {
       toast.error(isEdit ? "Failed to update." : "Failed to save.");
@@ -367,7 +402,7 @@ export default function BillingInt() {
     val ? dayjs(val).format("MMM D, YYYY") : "—";
 
   const paymentStatusColor = (s) => {
-    if (s === "Paid") return "success";
+    if (s === "Paid")    return "success";
     if (s === "Partial") return "warning";
     return "error";
   };
@@ -866,14 +901,14 @@ export default function BillingInt() {
               {/* Client selector — triggers auto-fill of gross/discount/net */}
               <Grid item xs={12}>
                 <TextField
-  label="Client ID"
-  select
-  fullWidth
-  size="small"
-  id="client-id-input"                
-  value={form.clientid}
-  onChange={(e) => handleChange("clientid", e.target.value)}
->
+                  label="Client ID"
+                  select
+                  fullWidth
+                  size="small"
+                  id="client-id-input"
+                  value={form.clientid}
+                  onChange={(e) => handleChange("clientid", e.target.value)}
+                >
                   {clientList.map((c) => (
                     <MenuItem key={c.ID} value={c.ClientID}>
                       {c.ClientID} — {c.TradeName || c.LNF || ""}
@@ -959,14 +994,14 @@ export default function BillingInt() {
 
               <Grid item xs={12} sm={6}>
                 <TextField
-  label="Payment Method"
-  select
-  fullWidth
-  size="small"
-  id="payment-method-input"           
-  value={form.paymentmethod}
-  onChange={(e) => handleChange("paymentmethod", e.target.value)}
->
+                  label="Payment Method"
+                  select
+                  fullWidth
+                  size="small"
+                  id="payment-method-input"
+                  value={form.paymentmethod}
+                  onChange={(e) => handleChange("paymentmethod", e.target.value)}
+                >
                   <MenuItem value="">— None —</MenuItem>
                   {PAYMENT_METHODS.map((m) => (
                     <MenuItem key={m} value={m}>{m}</MenuItem>
@@ -986,14 +1021,14 @@ export default function BillingInt() {
 
               <Grid item xs={12} sm={6}>
                 <TextField
-  label="Payment Status"
-  select
-  fullWidth
-  size="small"
-  id="payment-status-input"         
-  value={form.paymentstatus}
-  onChange={(e) => handleChange("paymentstatus", e.target.value)}
->
+                  label="Payment Status"
+                  select
+                  fullWidth
+                  size="small"
+                  id="payment-status-input"
+                  value={form.paymentstatus}
+                  onChange={(e) => handleChange("paymentstatus", e.target.value)}
+                >
                   {PAYMENT_STATUSES.map((s) => (
                     <MenuItem key={s} value={s}>{s}</MenuItem>
                   ))}
@@ -1034,7 +1069,6 @@ export default function BillingInt() {
             <Button variant="contained" color="error" onClick={handleDelete}>Delete</Button>
           </DialogActions>
         </Dialog>
-
 
       </Box>
     </LocalizationProvider>
