@@ -49,7 +49,7 @@ const NotificationData = () => {
       <>
         {[...Array(10)].map((_, index) => ( */}
           <ListContainer>
-            <NotifButton>
+            {/* <NotifButton>
                 <SkeletonAvatar />
                 <DataContainer>
                   <ListItemText sx={{
@@ -72,7 +72,7 @@ const NotificationData = () => {
                     </Stack>
                   </ListItemText>
                 </DataContainer>
-            </NotifButton>
+            </NotifButton> */}
           </ListContainer>
         {/* ))}
       </>

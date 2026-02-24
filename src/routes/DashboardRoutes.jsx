@@ -33,6 +33,12 @@ const TransactionList = Loadable(
 const BillingList = Loadable(
   lazy(() => import("../pages/billing/index"))
 );
+const ServicesAvailed = Loadable(
+  lazy(() => import("../pages/servicesAvailed/index"))
+);
+const PaymentLedger = Loadable(
+  lazy(() => import("../pages/paymentLedger/index"))
+);
 
 const DashboardRoutes = {
   path: "/",
@@ -61,6 +67,14 @@ const DashboardRoutes = {
     {
       path: "/dashboard/billing",
       element: <BillingList />,
+    },
+    {
+      path: "/dashboard/services-availed",
+      element: <ServicesAvailed />,
+    },
+    {
+      path: "/dashboard/payment-ledger",
+      element: <PaymentLedger />,
     },
 
     // others

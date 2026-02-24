@@ -19,15 +19,19 @@ import {
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import { useNavigate } from "react-router-dom";
 import RedeemIcon from "@mui/icons-material/Redeem";
+import LayersIcon from "@mui/icons-material/Layers";
+import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 
 export default function Administrative() {
   const theme = useTheme();
   const sideActiveColor = SvgIconColors(theme.palette.appSettings);
+  const isCollapsed = theme.palette.appSettings.layout === "collapsed";
+  const isHorizontal = theme.palette.appSettings.layout === "horizontal";
+  const isVertical = theme.palette.appSettings.layout === "vertical";
 
   const open = useSelector(
     (state) => state.customization.openManagementAdministrative
   );
-
   const activateColor = useSelector(
     (state) => state.customization.colorCashierPortal
   );
@@ -48,271 +52,165 @@ export default function Administrative() {
   const navigate = useNavigate();
   const id = "mouse-over-popover";
 
-  const navigateMassEditEmployeeSalary = () => {
-    navigate("/dashboard/edit-employee-salary");
-  };
-  const navigateSalaryGrade = () => {
-    navigate("/dashboard/services-list");
-  };
-  const navigateReqApp = () => {
-    navigate("/dashboard/request-approval");
-  };
-  const navigatetDTRApproval = () => {
-    navigate("/dashboard/dtr-approval");
-  };
-  const navigateManagementUser = () => {
-    navigate("/dashboard/management-user");
-  };
-  const navigateAuditLog = () => {
-    navigate("/dashboard/audit-log");
-  };
-  const navigateClients = () => {
-    navigate("/dashboard/clients");
-  };
+  // ── Navigation ──────────────────────────────────────────────────────────────
+  const navigateServicesList    = () => navigate("/dashboard/services-list");
+  const navigateServicesAvailed = () => navigate("/dashboard/services-availed");
+  const navigateClients         = () => navigate("/dashboard/clients");
+  const navigateTransactions    = () => navigate("/dashboard/transactions");
+  const navigateBilling         = () => navigate("/dashboard/billing");
+  const navigatePaymentLedger   = () => navigate("/dashboard/payment-ledger");
 
-  const navigateSOA = () => {
-    navigate("/dashboard/billing");
-  };
+  // ── Collapse toggles ────────────────────────────────────────────────────────
+  const toggleMasterfile = () => setOpenMasterfile((prev) => !prev);
+  const toggleClient     = () => setOpenClient((prev) => !prev);
+  const blackFunc        = () => {};
 
-  const navigatetransac = () => {
-    navigate("/dashboard/transactions");
-  };
-
-  const openMasterfileCollapseBtn = () => {
-    setOpenMasterfile((prev) => !prev);
-  };
-
-  const openClientCollapseBtn = () => {
-    setOpenClient((prev) => !prev);
-  };
-
-  const colorCollapseBtn = () => {
-    dispatch({ type: COLOR_DAR_OPTIONS, colorBatchingDar: true });
-  };
-
-  useEffect(() => {
-    if (location.pathname === "/dashboard/edit-employee-salary") {
-      dispatch({ type: COLOR_DAR_OPTIONS, colorBatchingDar: true });
-    } else {
-      dispatch({ type: COLOR_DAR_OPTIONS, colorBatchingDar: false });
-    }
-  }, [dispatch]);
-
-  const handleOpenMasterfileCollapse = (event) => {
-    setAnchorMasterfile(event.currentTarget);
-  };
+  // ── Popover handlers ────────────────────────────────────────────────────────
+  const handleOpenMasterfileCollapse  = (e) => setAnchorMasterfile(e.currentTarget);
   const handleCloseMasterfileCollapse = () => {
-    if (
-      popoverMasterfileRef.current &&
-      popoverMasterfileRef.current.contains(event.relatedTarget)
-    ) {
-      return;
-    }
+    if (popoverMasterfileRef.current?.contains(event.relatedTarget)) return;
     setAnchorMasterfile(null);
   };
 
-  const handleOpenClientCollapse = (event) => {
-    setAnchorClient(event.currentTarget);
-  };
+  const handleOpenClientCollapse  = (e) => setAnchorClient(e.currentTarget);
   const handleCloseClientCollapse = () => {
-    if (
-      popoverClientRef.current &&
-      popoverClientRef.current.contains(event.relatedTarget)
-    ) {
-      return;
-    }
+    if (popoverClientRef.current?.contains(event.relatedTarget)) return;
     setAnchorClient(null);
   };
 
-  const blackFunc = () => {};
+  // ── Arrow icon helper ───────────────────────────────────────────────────────
+  const CollapseArrow = ({ isOpen }) => (
+    <>
+      {/* vertical layout */}
+      {isOpen
+        ? <ArrowDropDownTwoToneIcon sx={{ display: isCollapsed || isHorizontal ? "none" : "flex" }} />
+        : <ArrowRightIcon           sx={{ display: isCollapsed || isHorizontal ? "none" : "flex" }} />
+      }
+      {/* horizontal layout */}
+      <ArrowDropDownTwoToneIcon sx={{ display: isHorizontal ? "flex" : "none" }} />
+    </>
+  );
+
+  useEffect(() => {
+    dispatch({
+      type: COLOR_DAR_OPTIONS,
+      colorBatchingDar: location.pathname === "/dashboard/edit-employee-salary",
+    });
+  }, [dispatch]);
+
+  const btnColors = {
+    bgcolor:    activateColor ? `${sideActiveColor.svgcolor[600]}` : "none",
+    iconcolor:  activateColor ? `${sideActiveColor.svgcolor[100]}` : "#637381",
+  };
 
   return (
     <>
-      {/* ===================== MASTERFILE ===================== */}
+      {/* ══════════════════════ MASTERFILE ══════════════════════ */}
       <StyledCollapsedButton
         id={id}
-        onClick={openMasterfileCollapseBtn}
-        IconChildren={<RedeemIcon fontSize="small" />}
+        onClick={toggleMasterfile}
+        IconChildren={<LayersIcon fontSize="small" />}
         CollpaseBtnLabels="Masterfile"
-        handlePopoverOpen={
-          theme.palette.appSettings.layout === "vertical"
-            ? blackFunc
-            : handleOpenMasterfileCollapse
-        }
+        handlePopoverOpen={isVertical ? blackFunc : handleOpenMasterfileCollapse}
         handlePopoverClose={handleCloseMasterfileCollapse}
-        bgcolor={activateColor ? `${sideActiveColor.svgcolor[600]}` : "none"}
-        iconcolor={
-          activateColor ? `${sideActiveColor.svgcolor[100]}` : "#637381"
-        }
+        {...btnColors}
       >
-        {openMasterfile ? (
-          <ArrowDropDownTwoToneIcon
-            sx={{
-              display:
-                theme.palette.appSettings.layout === "collapsed"
-                  ? "none"
-                  : theme.palette.appSettings.layout === "horizontal"
-                  ? "none"
-                  : "flex",
-            }}
-          />
-        ) : (
-          <ArrowRightIcon
-            sx={{
-              display:
-                theme.palette.appSettings.layout === "collapsed"
-                  ? "none"
-                  : theme.palette.appSettings.layout === "horizontal"
-                  ? "none"
-                  : "flex",
-            }}
-          />
-        )}
-        <ArrowDropDownTwoToneIcon
-          sx={{
-            display:
-              theme.palette.appSettings.layout === "collapsed"
-                ? "none"
-                : theme.palette.appSettings.layout === "horizontal"
-                ? "flex"
-                : "none",
-          }}
-        />
+        <CollapseArrow isOpen={openMasterfile} />
       </StyledCollapsedButton>
 
+      {/* Collapsed / horizontal popover */}
       <StyledPopover
         id={id}
         open={openMasterfileBool}
         anchorEl={anchorMasterfile}
         onMouseLeave={handleCloseMasterfileCollapse}
-        onMouseEnter={openMasterfileCollapseBtn}
+        onMouseEnter={toggleMasterfile}
         popoverRef={popoverMasterfileRef}
         menuButton={
           <>
             <CustomMenuButton
-              label="Services Lists"
+              label="Services List"
               activePath="/dashboard/services-list"
-              onClick={navigateSalaryGrade}
+              onClick={navigateServicesList}
             />
             <CustomMenuButton
               label="Payment Ledger"
-              activePath="/dashboard/device-list"
-              onClick={navigateMassEditEmployeeSalary}
+              activePath="/dashboard/payment-ledger"
+              onClick={navigatePaymentLedger}
             />
           </>
         }
       />
 
+      {/* Vertical expanded collapse */}
       <Collapsebtn stateOpen={openMasterfile}>
         <ListBtn
-          label="Services Lists"
+          label="Services List"
           activePath="/dashboard/services-list"
-          onClick={navigateSalaryGrade}
+          onClick={navigateServicesList}
         />
         <ListBtn
           label="Payment Ledger"
-          activePath="/dashboard/device-list"
-          onClick={navigateMassEditEmployeeSalary}
+          activePath="/dashboard/payment-ledger"
+          onClick={navigatePaymentLedger}
         />
       </Collapsebtn>
 
-      {/* ===================== CLIENT ===================== */}
+      {/* ══════════════════════ CLIENT ══════════════════════════ */}
       <StyledCollapsedButton
         id={id}
-        // Clicking the whole bar toggles the dropdown
-        onClick={openClientCollapseBtn}
-        IconChildren={<RedeemIcon fontSize="small" />}
-        // Clicking the label text navigates to /clients
+        onClick={toggleClient}
+        IconChildren={<PeopleAltIcon fontSize="small" />}
         CollpaseBtnLabels={
           <span
-            onClick={(e) => {
-              e.stopPropagation(); // prevents the bar onClick from also firing
-              navigateClients();
-            }}
+            onClick={(e) => { e.stopPropagation(); navigateClients(); }}
             style={{ cursor: "pointer" }}
           >
             Client
           </span>
         }
-        handlePopoverOpen={
-          theme.palette.appSettings.layout === "vertical"
-            ? blackFunc
-            : handleOpenClientCollapse
-        }
+        handlePopoverOpen={isVertical ? blackFunc : handleOpenClientCollapse}
         handlePopoverClose={handleCloseClientCollapse}
-        bgcolor={activateColor ? `${sideActiveColor.svgcolor[600]}` : "none"}
-        iconcolor={
-          activateColor ? `${sideActiveColor.svgcolor[100]}` : "#637381"
-        }
+        {...btnColors}
       >
-        {openClient ? (
-          <ArrowDropDownTwoToneIcon
-            sx={{
-              display:
-                theme.palette.appSettings.layout === "collapsed"
-                  ? "none"
-                  : theme.palette.appSettings.layout === "horizontal"
-                  ? "none"
-                  : "flex",
-            }}
-          />
-        ) : (
-          <ArrowRightIcon
-            sx={{
-              display:
-                theme.palette.appSettings.layout === "collapsed"
-                  ? "none"
-                  : theme.palette.appSettings.layout === "horizontal"
-                  ? "none"
-                  : "flex",
-            }}
-          />
-        )}
-        <ArrowDropDownTwoToneIcon
-          sx={{
-            display:
-              theme.palette.appSettings.layout === "collapsed"
-                ? "none"
-                : theme.palette.appSettings.layout === "horizontal"
-                ? "flex"
-                : "none",
-          }}
-        />
+        <CollapseArrow isOpen={openClient} />
       </StyledCollapsedButton>
 
+      {/* Collapsed / horizontal popover */}
       <StyledPopover
         id={id}
         open={openClientBool}
         anchorEl={anchorClient}
         onMouseLeave={handleCloseClientCollapse}
-        onMouseEnter={openClientCollapseBtn}
+        onMouseEnter={toggleClient}
         popoverRef={popoverClientRef}
         menuButton={
           <>
             <CustomMenuButton
-              label="Services Avail"
-              activePath="/dashboard/services-list"
-              onClick={navigateSalaryGrade}
+              label="Services Availed"
+              activePath="/dashboard/services-availed"
+              onClick={navigateServicesAvailed}
             />
             <CustomMenuButton
-              label="History/Logs"
+              label="Create Transaction & Logs"
               activePath="/dashboard/transactions"
-              onClick={navigatetransac}
+              onClick={navigateTransactions}
             />
           </>
         }
       />
 
+      {/* Vertical expanded collapse */}
       <Collapsebtn stateOpen={openClient}>
         <ListBtn
-          label="Services Avail"
-          activePath="/dashboard/"
-          onClick={navigateSalaryGrade}
+          label="Services Availed"
+          activePath="/dashboard/services-availed"
+          onClick={navigateServicesAvailed}
         />
         <ListBtn
-          label="History/Logs"
-          activePath="/dashboard/transactions/"
-          onClick={navigatetransac}
+          label="Create Transaction & Logs"
+          activePath="/dashboard/transactions"
+          onClick={navigateTransactions}
         />
       </Collapsebtn>
     </>
