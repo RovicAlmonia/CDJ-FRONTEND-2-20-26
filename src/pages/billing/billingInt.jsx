@@ -56,6 +56,9 @@ const emptyForm = {
   paymentmethod: "",
   paymentreference: "",
   paymentstatus: "Unpaid",
+  // For display only — not sent to server
+  _carryForwardBalance: 0,
+  _newMonthGross: 0,
 };
 
 const PAYMENT_METHODS = ["Cash", "Check", "Bank Transfer", "GCash", "Maya"];
@@ -123,22 +126,89 @@ export default function BillingInt() {
   const grandNet      = enrichedList.reduce((s, r) => s + parseFloat(r.Net           || 0), 0);
   const grandPaid     = enrichedList.reduce((s, r) => s + parseFloat(r.PaymentAmount || 0), 0);
 
-  // ── handleChange: auto-fill gross/discount/net from transactions when client selected ──
+  /**
+   * Compute the unpaid carry-forward balance for a given client.
+   *
+   * Logic:
+   *   For every existing billing record of this client, calculate:
+   *     balance = Net - PaymentAmount
+   *   Sum all positive balances (outstanding amounts).
+   *
+   * This means:
+   *   - If they owe ₱33,000 from last month and this month's transactions
+   *     add ₱66,000 more, the new Net = ₱33,000 + ₱66,000 = ₱99,000.
+   *   - The existing billing record (last month's) stays as-is; only the
+   *     NEW record carries the rolled-over balance forward.
+   */
+  const getCarryForwardBalance = (clientId, excludeBillingId = null) => {
+    const clientBillings = billingList.filter(
+      (b) =>
+        String(b.ClientID) === String(clientId) &&
+        (excludeBillingId === null || String(b.ID) !== String(excludeBillingId))
+    );
+
+    if (clientBillings.length === 0) return 0;
+
+    // Sort by ID descending — most recent record first
+    const sorted = [...clientBillings].sort((a, b) => Number(b.ID) - Number(a.ID));
+    const latest = sorted[0];
+
+    // If the latest billing is fully Paid, slate is clean — no carry forward
+    if (latest.PaymentStatus === "Paid") return 0;
+
+    // Otherwise carry forward only the remaining balance of the latest record
+    const net  = parseFloat(latest.Net           || 0);
+    const paid = parseFloat(latest.PaymentAmount || 0);
+    return Math.max(0, net - paid);
+  };
+
+  // ── handleChange: auto-fill gross/discount/net + carry-forward balance ──
   const handleChange = (field, value) => {
     setForm((prev) => {
       const updated = { ...prev, [field]: value };
 
       if (field === "clientid") {
-        const clientTxns = transactionList.filter(
+        // Check if the latest billing record for this client is fully Paid
+        const clientBillings = billingList.filter(
+          (b) => String(b.ClientID) === String(value)
+        );
+        const sorted = [...clientBillings].sort((a, b) => Number(b.ID) - Number(a.ID));
+        const latestBilling = sorted[0];
+        const isLatestPaid  = latestBilling?.PaymentStatus === "Paid";
+
+        // Determine client retention type
+        const clientInfo    = clientList.find((c) => String(c.ClientID) === String(value));
+        const retentionType = (clientInfo?.RetentionType || "").toLowerCase();
+        const isMonthly     = retentionType === "monthly";
+
+        // For Monthly retention: only include transactions from the CURRENT month.
+        // For other types: include all transactions (existing behavior).
+        const now           = dayjs();
+        const allClientTxns = transactionList.filter(
           (t) => String(t.ClientID) === String(value)
         );
-        const autoGross    = clientTxns.reduce((s, t) => s + parseFloat(t.GrossTotal || 0), 0);
-        const autoDiscount = clientTxns.reduce((s, t) => s + parseFloat(t.Discount   || 0), 0);
-        const autoNet      = clientTxns.reduce((s, t) => s + parseFloat(t.NetTotal   || 0), 0);
+        const clientTxns = isMonthly
+          ? allClientTxns.filter((t) => {
+              if (!t.TransactionDate) return false;
+              const d = dayjs(t.TransactionDate);
+              return d.month() === now.month() && d.year() === now.year();
+            })
+          : allClientTxns;
 
-        updated.gross    = autoGross.toFixed(2);
-        updated.discount = autoDiscount.toFixed(2);
-        updated.net      = autoNet.toFixed(2);
+        const newMonthGross    = isLatestPaid ? 0 : clientTxns.reduce((s, t) => s + parseFloat(t.GrossTotal || 0), 0);
+        const newMonthDiscount = isLatestPaid ? 0 : clientTxns.reduce((s, t) => s + parseFloat(t.Discount   || 0), 0);
+        const newMonthNet      = isLatestPaid ? 0 : clientTxns.reduce((s, t) => s + parseFloat(t.NetTotal   || 0), 0);
+        const carryForward     = isLatestPaid ? 0 : getCarryForwardBalance(value);
+        const totalNet         = newMonthNet + carryForward;
+
+        updated.gross                  = newMonthGross.toFixed(2);
+        updated.discount               = newMonthDiscount.toFixed(2);
+        updated.net                    = totalNet.toFixed(2);
+        updated._carryForwardBalance   = carryForward;
+        updated._newMonthGross         = newMonthGross;
+        updated._isLatestPaid          = isLatestPaid;
+        updated._isMonthly             = isMonthly;
+        updated._currentMonthTxnCount  = isMonthly ? clientTxns.length : allClientTxns.length;
 
         // Reset payment fields when client changes
         updated.paymentamount    = "";
@@ -150,16 +220,18 @@ export default function BillingInt() {
         return updated;
       }
 
-      // Recalculate net when gross or discount changes
+      // Recalculate net when gross or discount changes (manual override)
       const gross    = parseFloat(field === "gross"    ? value : updated.gross)    || 0;
       const discount = parseFloat(field === "discount" ? value : updated.discount) || 0;
       const payment  = parseFloat(field === "paymentamount" ? value : updated.paymentamount) || 0;
+      const carry    = updated._carryForwardBalance || 0;
 
-      updated.net = (gross - discount).toFixed(2);
+      // Net = (gross - discount) + carry-forward
+      updated.net = (gross - discount + carry).toFixed(2);
 
       // Auto-set payment status
       if (field === "paymentamount" || field === "gross" || field === "discount") {
-        const net = gross - discount;
+        const net = gross - discount + carry;
         if (payment <= 0)        updated.paymentstatus = "Unpaid";
         else if (payment >= net) updated.paymentstatus = "Paid";
         else                     updated.paymentstatus = "Partial";
@@ -176,6 +248,8 @@ export default function BillingInt() {
   };
 
   const handleEdit = (row) => {
+    // When editing, the carry-forward is all OTHER billing records for this client
+    const carryForward = getCarryForwardBalance(row.ClientID, row.ID);
     setForm({
       id: row.ID,
       clientid: row.ClientID || "",
@@ -187,6 +261,8 @@ export default function BillingInt() {
       paymentmethod: row.PaymentMethod || "",
       paymentreference: row.PaymentReference || "",
       paymentstatus: row.PaymentStatus || "Unpaid",
+      _carryForwardBalance: carryForward,
+      _newMonthGross: parseFloat(row.Gross || 0),
     });
     setIsEdit(true);
     setOpen(true);
@@ -203,7 +279,7 @@ export default function BillingInt() {
   const resolveTransactionStatus = (paymentstatus) => {
     if (paymentstatus === "Paid")    return "Paid";
     if (paymentstatus === "Partial") return "Posted";
-    return "Active"; // Unpaid → keep as Active
+    return "Active";
   };
 
   const handleSubmit = async () => {
@@ -212,47 +288,54 @@ export default function BillingInt() {
       return;
     }
     const payload = {
-      ...form,
+      // Strip internal-only fields before sending to server
+      id: form.id,
+      clientid: form.clientid,
       gross: parseFloat(form.gross) || 0,
       discount: parseFloat(form.discount) || 0,
       net: parseFloat(form.net) || 0,
       paymentamount: parseFloat(form.paymentamount) || 0,
       paymentdate: fmt(form.paymentdate),
+      paymentmethod: form.paymentmethod,
+      paymentreference: form.paymentreference,
+      paymentstatus: form.paymentstatus,
     };
     try {
-      // 1. Save or update billing record
       if (isEdit) {
+        // ── EDIT: update ONLY this billing record — never touch transactions ──
+        // Editing payment details (amount, method, status) on one billing record
+        // must NOT affect other billing records or their linked transactions.
         await http.post("/updatebillinghdr", payload);
+        toast.success("Billing record updated.");
+
       } else {
+        // ── ADD: save new billing + cascade status to all active client transactions ──
         await http.post("/postbillinghdr", payload);
+
+        const txnStatus  = resolveTransactionStatus(form.paymentstatus);
+        const clientTxns = transactionList.filter(
+          (t) => String(t.ClientID) === String(form.clientid)
+        );
+
+        await Promise.all(
+          clientTxns.map((txn) =>
+            http.post("/updatetransactionhdr", {
+              id: txn.ID,
+              transactiondate: txn.TransactionDate,
+              clientid: txn.ClientID,
+              particulars: txn.Particulars,
+              grosstotal: txn.GrossTotal,
+              discount: txn.Discount,
+              nettotal: txn.NetTotal,
+              status: txnStatus,
+            })
+          )
+        );
+
+        toast.success(
+          `Billing saved. ${clientTxns.length} transaction(s) marked as "${txnStatus}".`
+        );
       }
-
-      // 2. Cascade status to all linked transactions
-      const txnStatus = resolveTransactionStatus(form.paymentstatus);
-      const clientTxns = transactionList.filter(
-        (t) => String(t.ClientID) === String(form.clientid)
-      );
-
-      await Promise.all(
-        clientTxns.map((txn) =>
-          http.post("/updatetransactionhdr", {
-            id: txn.ID,
-            transactiondate: txn.TransactionDate,
-            clientid: txn.ClientID,
-            particulars: txn.Particulars,
-            grosstotal: txn.GrossTotal,
-            discount: txn.Discount,
-            nettotal: txn.NetTotal,
-            status: txnStatus,
-          })
-        )
-      );
-
-      toast.success(
-        isEdit
-          ? `Billing updated. ${clientTxns.length} transaction(s) marked as "${txnStatus}".`
-          : `Billing saved. ${clientTxns.length} transaction(s) marked as "${txnStatus}".`
-      );
 
       queryClient.invalidateQueries("/selectbillinghdr");
       queryClient.invalidateQueries("/selecttransactionhdr");
@@ -275,7 +358,7 @@ export default function BillingInt() {
     }
   };
 
-  // ── Print Receipt: writes full HTML to a new window — never blank ──
+  // ── Print Receipt ──
   const handlePrint = (row) => {
     const fmtM = (val) =>
       parseFloat(val || 0).toLocaleString("en-PH", {
@@ -443,6 +526,10 @@ export default function BillingInt() {
   const readOnlySx = {
     "& .MuiOutlinedInput-root": { backgroundColor: "action.hover" },
   };
+
+  // Carry-forward info for display in the form
+  const carryForward = form._carryForwardBalance || 0;
+  const newMonthNet  = parseFloat(form.net || 0) - carryForward;
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -851,10 +938,7 @@ export default function BillingInt() {
           />
         </Paper>
 
-        {/* ── Add/Edit Dialog ──
-            disableRestoreFocus  → fixes aria-hidden warning on close
-            component="div"      → fixes <h6> inside <h2> nesting warning
-        ── */}
+        {/* ── Add/Edit Dialog ── */}
         <Dialog
           open={open}
           onClose={handleClose}
@@ -898,7 +982,7 @@ export default function BillingInt() {
                 </Typography>
               </Grid>
 
-              {/* Client selector — triggers auto-fill of gross/discount/net */}
+              {/* Client selector */}
               <Grid item xs={12}>
                 <TextField
                   label="Client ID"
@@ -917,7 +1001,46 @@ export default function BillingInt() {
                 </TextField>
               </Grid>
 
-              {/* Gross — read-only, auto-filled from transactions */}
+              {/* Carry-forward balance info banner — only shown when there's a prior balance */}
+              {!isEdit && carryForward > 0 && form.clientid && (
+                <Grid item xs={12}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid",
+                      borderColor: "warning.main",
+                      borderRadius: 1.5,
+                      backgroundColor: alpha(theme.palette.warning.main, darkMode ? 0.15 : 0.06),
+                    }}
+                  >
+                    <Typography variant="caption" fontWeight="bold" color="warning.main">
+                      ⚠ Outstanding Balance Carried Forward
+                    </Typography>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary">This month's transactions</Typography>
+                      <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace" }}>
+                        ₱ {fmtMoney(newMonthNet)}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                      <Typography variant="caption" color="text.secondary">Prior unpaid balance</Typography>
+                      <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace", color: "error.main" }}>
+                        + ₱ {fmtMoney(carryForward)}
+                      </Typography>
+                    </Box>
+                    <Divider sx={{ my: 0.8 }} />
+                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                      <Typography variant="caption" fontWeight="bold">Total Due</Typography>
+                      <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace", color: "warning.main" }}>
+                        ₱ {fmtMoney(parseFloat(form.net || 0))}
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+              )}
+
+              {/* Gross — read-only */}
               <Grid item xs={12} sm={6}>
                 <TextField
                   label="Gross (₱)"
@@ -927,11 +1050,15 @@ export default function BillingInt() {
                   value={form.gross}
                   InputProps={{ readOnly: true }}
                   sx={readOnlySx}
-                  helperText="Auto-filled from transactions"
+                  helperText={
+                    form._isMonthly && !isEdit
+                      ? `Monthly — ${dayjs().format("MMMM YYYY")} transactions`
+                      : "Auto-filled from transactions"
+                  }
                 />
               </Grid>
 
-              {/* Discount — read-only, auto-filled from transactions */}
+              {/* Discount — read-only */}
               <Grid item xs={12} sm={6}>
                 <TextField
                   label="Discount (₱)"
@@ -941,11 +1068,15 @@ export default function BillingInt() {
                   value={form.discount}
                   InputProps={{ readOnly: true }}
                   sx={readOnlySx}
-                  helperText="Auto-filled from transactions"
+                  helperText={
+                    form._isMonthly && !isEdit
+                      ? `Monthly — ${dayjs().format("MMMM YYYY")} transactions`
+                      : "Auto-filled from transactions"
+                  }
                 />
               </Grid>
 
-              {/* Net — read-only, computed */}
+              {/* Net — read-only, includes carry-forward */}
               <Grid item xs={12} sm={6}>
                 <TextField
                   label="Net (₱)"
@@ -954,7 +1085,15 @@ export default function BillingInt() {
                   value={form.net}
                   InputProps={{ readOnly: true }}
                   sx={readOnlySx}
-                  helperText="Gross minus Discount"
+                  helperText={
+                    form._isLatestPaid && !isEdit
+                      ? "Previous bill fully paid — enter new transactions"
+                      : carryForward > 0 && !isEdit
+                      ? `Includes ₱${fmtMoney(carryForward)} prior balance`
+                      : form._isMonthly && !isEdit
+                      ? `This month's transactions only (${form._currentMonthTxnCount || 0} txn${(form._currentMonthTxnCount || 0) !== 1 ? "s" : ""})`
+                      : "Gross minus Discount"
+                  }
                 />
               </Grid>
 
@@ -976,7 +1115,6 @@ export default function BillingInt() {
                 />
               </Grid>
 
-              {/* DatePicker: id passed via slotProps fixes label-for mismatch warning */}
               <Grid item xs={12} sm={6}>
                 <DatePicker
                   label="Payment Date"
@@ -1046,10 +1184,7 @@ export default function BillingInt() {
           </DialogActions>
         </Dialog>
 
-        {/* ── Delete Confirmation ──
-            disableRestoreFocus  → fixes aria-hidden warning on close
-            component="div"      → fixes <h6> inside <h2> nesting warning
-        ── */}
+        {/* ── Delete Confirmation ── */}
         <Dialog
           open={deleteConfirm.open}
           onClose={() => setDeleteConfirm({ open: false, id: null })}

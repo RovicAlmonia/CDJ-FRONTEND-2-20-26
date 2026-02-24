@@ -18,7 +18,6 @@ import FilterAltOffIcon from "@mui/icons-material/FilterAltOff";
 import ReceiptIcon from "@mui/icons-material/Receipt";
 import PrintIcon from "@mui/icons-material/Print";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { hookContainer } from "../../hooks/globalQuery";
 import { useQueryClient } from "@tanstack/react-query";
 import { http } from "../../api/http";
@@ -41,6 +40,30 @@ const fmtPHP = (v) =>
 
 const fmtDate = (v) => v ? dayjs(v).format("MMM D, YYYY") : "—";
 
+const pick = (obj, ...keys) => {
+  for (const k of keys) {
+    if (obj[k] !== undefined && obj[k] !== null && obj[k] !== "") return obj[k];
+  }
+  const lower = keys.map((k) => k.toLowerCase());
+  for (const ok of Object.keys(obj)) {
+    if (lower.includes(ok.toLowerCase()) && obj[ok] !== undefined && obj[ok] !== null && obj[ok] !== "") {
+      return obj[ok];
+    }
+  }
+  return undefined;
+};
+
+const normalizeDtl = (r) => ({
+  ID:          pick(r, "ID", "id")                                                   ?? "",
+  ServiceID:   pick(r, "ServiceID", "serviceId", "serviceid", "service_id")         ?? "",
+  ServiceName: pick(r, "ServiceName", "serviceName", "servicename", "service_name") ?? "—",
+  Rate:        pick(r, "Rate", "rate")                                               ?? 0,
+  QTY:         pick(r, "QTY", "Qty", "qty", "quantity", "Quantity")                 ?? 1,
+  Gross:       pick(r, "Gross", "gross")                                             ?? 0,
+  Discount:    pick(r, "Discount", "discount")                                       ?? 0,
+  Net:         pick(r, "Net", "net")                                                 ?? 0,
+});
+
 export default function TransactionInt() {
   const theme = useTheme();
   const darkMode = theme.palette.mode === "dark";
@@ -57,26 +80,29 @@ export default function TransactionInt() {
   const serviceList = Array.isArray(servicesRaw?.data) ? servicesRaw.data : [];
 
   // HDR state
-  const [hdrForm, setHdrForm]   = useState(emptyHdr);
-  const [isEdit, setIsEdit]     = useState(false);
-  const [open, setOpen]         = useState(false);
+  const [hdrForm, setHdrForm] = useState(emptyHdr);
+  const [isEdit, setIsEdit]   = useState(false);
+  const [open, setOpen]       = useState(false);
 
-  // DTL state (line items inside dialog)
-  const [dtlRows, setDtlRows]   = useState([]);
-  const [dtlForm, setDtlForm]   = useState(emptyDtl);
-  const [dtlEdit, setDtlEdit]   = useState(false);
+  // DTL state
+  const [dtlRows, setDtlRows] = useState([]);
+  const [dtlForm, setDtlForm] = useState(emptyDtl);
+  const [dtlEdit, setDtlEdit] = useState(false);
 
-  // Table state
-  const [page, setPage]         = useState(0);
+  // Table / filter state
+  const [page, setPage]               = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, id: null });
 
-  // Receipt dialog
-  const [receiptOpen, setReceiptOpen]   = useState(false);
-  const [receiptData, setReceiptData]   = useState(null);
-  const [receiptDtls, setReceiptDtls]   = useState([]);
+  // ── Receipt state ──
+  const [receiptOpen, setReceiptOpen]     = useState(false);
+  const [receiptMode, setReceiptMode]     = useState("single");
+  const [receiptClient, setReceiptClient] = useState(null);
+  const [receiptData, setReceiptData]     = useState(null);
+  const [receiptDtls, setReceiptDtls]     = useState([]);
+  const [receiptGroups, setReceiptGroups] = useState([]);
 
   const filteredList = hdrList.filter((row) => {
     const q = searchQuery.toLowerCase();
@@ -98,19 +124,15 @@ export default function TransactionInt() {
   const hdrChange = (f, v) => setHdrForm((p) => ({ ...p, [f]: v }));
 
   const computeHdrTotals = (rows) => {
-    const gross    = rows.reduce((s, r) => s + parseFloat(r.gross    || 0), 0);
-    const discount = rows.reduce((s, r) => s + parseFloat(r.discount || 0), 0);
-    const net      = rows.reduce((s, r) => s + parseFloat(r.net      || 0), 0);
+    const gross    = rows.reduce((s, r) => s + parseFloat(pick(r, "gross", "Gross")       || 0), 0);
+    const discount = rows.reduce((s, r) => s + parseFloat(pick(r, "discount", "Discount") || 0), 0);
+    const net      = rows.reduce((s, r) => s + parseFloat(pick(r, "net", "Net")           || 0), 0);
     setHdrForm((p) => ({ ...p, grosstotal: gross, discount, nettotal: net }));
   };
 
   const handleOpen = () => {
-    setHdrForm(emptyHdr);
-    setDtlRows([]);
-    setDtlForm(emptyDtl);
-    setDtlEdit(false);
-    setIsEdit(false);
-    setOpen(true);
+    setHdrForm(emptyHdr); setDtlRows([]); setDtlForm(emptyDtl);
+    setDtlEdit(false); setIsEdit(false); setOpen(true);
   };
 
   const handleEdit = async (row) => {
@@ -120,16 +142,12 @@ export default function TransactionInt() {
       grosstotal: row.GrossTotal || 0, discount: row.Discount || 0,
       nettotal: row.NetTotal || 0, status: row.Status || "Active",
     });
-    // Load DTL rows
     try {
       const res = await http.get(`/selecttransactiondtlbyhdr?hdrid=${row.ID}`);
       const rows = Array.isArray(res?.data?.data) ? res.data.data : [];
       setDtlRows(rows.map((r, i) => ({ ...r, _key: r.ID || i })));
     } catch { setDtlRows([]); }
-    setDtlForm(emptyDtl);
-    setDtlEdit(false);
-    setIsEdit(true);
-    setOpen(true);
+    setDtlForm(emptyDtl); setDtlEdit(false); setIsEdit(true); setOpen(true);
   };
 
   const handleClose = () => { setOpen(false); setHdrForm(emptyHdr); setDtlRows([]); };
@@ -140,9 +158,6 @@ export default function TransactionInt() {
       ...hdrForm,
       transactiondate: hdrForm.transactiondate
         ? dayjs(hdrForm.transactiondate).format("YYYY-MM-DD") : null,
-      grosstotal: hdrForm.grosstotal,
-      discount:   hdrForm.discount,
-      nettotal:   hdrForm.nettotal,
     };
     try {
       let hdrId = hdrForm.id;
@@ -154,13 +169,9 @@ export default function TransactionInt() {
         hdrId = res?.data?.data?.insertId || res?.data?.insertId;
         toast.success("Transaction saved!");
       }
-      // Save DTL rows
       for (const dtl of dtlRows) {
-        if (dtl._new) {
-          await http.post("/posttransactiondtl", { ...dtl, transactionhdrid: hdrId });
-        } else if (dtl._updated) {
-          await http.post("/updatetransactiondtl", dtl);
-        }
+        if (dtl._new)          await http.post("/posttransactiondtl",    { ...dtl, transactionhdrid: hdrId });
+        else if (dtl._updated) await http.post("/updatetransactiondtl",  dtl);
       }
       queryClient.invalidateQueries("/selecttransactionhdr");
       handleClose();
@@ -202,38 +213,82 @@ export default function TransactionInt() {
       const updated = dtlRows.map((r) =>
         r._key === dtlForm._key ? { ...dtlForm, _updated: !dtlForm._new } : r
       );
-      setDtlRows(updated);
-      computeHdrTotals(updated);
+      setDtlRows(updated); computeHdrTotals(updated);
     } else {
-      const newRow = { ...dtlForm, _key: Date.now(), _new: true };
-      const updated = [...dtlRows, newRow];
-      setDtlRows(updated);
-      computeHdrTotals(updated);
+      const updated = [...dtlRows, { ...dtlForm, _key: Date.now(), _new: true }];
+      setDtlRows(updated); computeHdrTotals(updated);
     }
-    setDtlForm(emptyDtl);
-    setDtlEdit(false);
+    setDtlForm(emptyDtl); setDtlEdit(false);
   };
 
-  const editDtlRow = (row) => { setDtlForm(row); setDtlEdit(true); };
+  const editDtlRow  = (row) => { setDtlForm(row); setDtlEdit(true); };
 
   const removeDtlRow = async (row) => {
     if (row.ID && !row._new) {
       try { await http.delete(`/deletetransactiondtl?id=${row.ID}`); } catch { /**/ }
     }
     const updated = dtlRows.filter((r) => r._key !== row._key);
-    setDtlRows(updated);
-    computeHdrTotals(updated);
+    setDtlRows(updated); computeHdrTotals(updated);
   };
 
-  // ── Receipt ──
-  const handleViewReceipt = async (row) => {
-    setReceiptData(row);
+  // ── Receipt helpers ──
+  const fetchDtlForHdr = async (hdrId) => {
     try {
-      const res = await http.get(`/selecttransactiondtlbyhdr?hdrid=${row.ID}`);
-      setReceiptDtls(Array.isArray(res?.data?.data) ? res.data.data : []);
-    } catch { setReceiptDtls([]); }
+      const res = await http.get(`/selecttransactiondtlbyhdr?hdrid=${hdrId}`);
+      const raw = Array.isArray(res?.data?.data)
+        ? res.data.data
+        : Array.isArray(res?.data) ? res.data : [];
+      return raw.map(normalizeDtl);
+    } catch { return []; }
+  };
+
+  const handleViewReceipt = async (row) => {
+    const cName = clientName(row.ClientID);
+    setReceiptClient({ id: row.ClientID, name: cName });
+    setReceiptData(row);
+    setReceiptDtls([]);
+    setReceiptGroups([]);
+    setReceiptMode("single");
+
+    const dtls = await fetchDtlForHdr(row.ID);
+    setReceiptDtls(dtls);
     setReceiptOpen(true);
   };
+
+  /**
+   * Combined receipt — only includes transactions that are NOT fully Paid.
+   */
+  const handleViewCombinedReceipt = async (clientId) => {
+    const cName = clientName(clientId);
+    setReceiptClient({ id: clientId, name: cName });
+    setReceiptMode("combined");
+    setReceiptGroups([]);
+    setReceiptOpen(true);
+
+    // ✅ Exclude Paid transactions from the combined receipt
+    const clientHdrs = hdrList.filter(
+      (h) => String(h.ClientID) === String(clientId) && h.Status !== "Paid"
+    );
+
+    const groups = await Promise.all(
+      clientHdrs.map(async (hdr) => ({
+        hdr,
+        dtls: await fetchDtlForHdr(hdr.ID),
+      }))
+    );
+    setReceiptGroups(groups);
+  };
+
+  // Combined receipt grand totals (already filtered to non-Paid)
+  const combinedGross    = receiptGroups.reduce((s, g) => s + parseFloat(g.hdr.GrossTotal || 0), 0);
+  const combinedDiscount = receiptGroups.reduce((s, g) => s + parseFloat(g.hdr.Discount   || 0), 0);
+  const combinedNet      = receiptGroups.reduce((s, g) => s + parseFloat(g.hdr.NetTotal   || 0), 0);
+
+  // Count unpaid/active transactions per client (for showing the combined button)
+  const unpaidClientCount = (clientId) =>
+    hdrList.filter(
+      (h) => String(h.ClientID) === String(clientId) && h.Status !== "Paid"
+    ).length;
 
   const handlePrint = () => {
     const content = printRef.current.innerHTML;
@@ -242,20 +297,20 @@ export default function TransactionInt() {
       <html><head><title>Transaction Receipt</title>
       <style>
         body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; color: #000; }
-        h2 { text-align: center; margin-bottom: 4px; }
-        p { margin: 2px 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        h2,h3 { text-align: center; margin-bottom: 4px; }
+        p  { margin: 2px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         th { background: #1a3a5c; color: #fff; padding: 6px 8px; text-align: left; font-size: 11px; }
         td { padding: 5px 8px; border-bottom: 1px solid #ddd; font-size: 11px; }
+        .section-hdr { background: #e8f0fe; font-weight: bold; font-size: 11px; padding: 4px 8px; }
         .total-row td { font-weight: bold; border-top: 2px solid #1a3a5c; }
+        .grand-total td { font-weight: bold; background: #1a3a5c; color: #fff; font-size: 12px; }
         .right { text-align: right; }
-        .header-grid { display: flex; gap: 40px; margin: 10px 0; }
-        .header-col { flex: 1; }
         .label { color: #666; font-size: 10px; text-transform: uppercase; }
         .value { font-weight: 600; font-size: 12px; }
-        .status-badge { display:inline-block; padding: 2px 8px; border-radius: 4px;
-          background: #1a5c30; color: #fff; font-size: 10px; font-weight: bold; }
         .divider { border: none; border-top: 1px solid #ccc; margin: 8px 0; }
+        .info-grid { display: flex; gap: 32px; margin: 10px 0; flex-wrap: wrap; }
+        .info-col  { min-width: 120px; }
       </style>
       </head><body>${content}</body></html>
     `);
@@ -263,7 +318,7 @@ export default function TransactionInt() {
     win.print();
   };
 
-  // ── Styles (identical to clientInt) ──
+  // ── Styles ──
   const cellSx = {
     fontSize: "0.82rem", whiteSpace: "nowrap",
     px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider",
@@ -274,7 +329,7 @@ export default function TransactionInt() {
     textTransform: "uppercase", letterSpacing: "0.05em",
     borderBottom: "2px solid", borderColor: "divider",
   };
-  const dtlCellSx = { ...cellSx, py: 0.6 };
+  const dtlCellSx   = { ...cellSx, py: 0.6 };
   const dtlHeaderSx = { ...headerSx, py: 1 };
 
   const clientName = (id) => {
@@ -284,6 +339,56 @@ export default function TransactionInt() {
 
   const statusColor = (s) =>
     s === "Paid" ? "success" : s === "Posted" ? "primary" : "warning";
+
+  const sameClientCount = (clientId) =>
+    hdrList.filter((h) => String(h.ClientID) === String(clientId)).length;
+
+  // ── Receipt DTL table ──
+  const ReceiptDtlTable = ({ dtls }) => (
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            {["#", "Service", "Rate", "QTY", "Gross", "Disc.", "Net"].map((h) => (
+              <TableCell key={h} sx={{
+                ...headerSx, py: 0.8,
+                backgroundColor: darkMode ? "#1a2a3a" : "#1a3a5c",
+                color: "#fff",
+              }}>{h}</TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {dtls.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} align="center"
+                sx={{ py: 1.5, color: "text.secondary", fontSize: "0.78rem" }}>
+                No line items.
+              </TableCell>
+            </TableRow>
+          ) : dtls.map((dtl, i) => (
+            <TableRow key={dtl.ID || i} sx={{ backgroundColor: i % 2 === 0 ? "transparent" : "action.hover" }}>
+              <TableCell sx={{ ...cellSx, color: "text.disabled", width: 32, textAlign: "center" }}>{i + 1}</TableCell>
+              <TableCell sx={{ ...cellSx, fontWeight: 600 }}>{dtl.ServiceName}</TableCell>
+              <TableCell sx={cellSx} align="right">
+                <Typography variant="caption" sx={{ fontFamily: "monospace" }}>{fmtPHP(dtl.Rate)}</Typography>
+              </TableCell>
+              <TableCell sx={{ ...cellSx, textAlign: "center" }}>{dtl.QTY}</TableCell>
+              <TableCell sx={cellSx} align="right">
+                <Typography variant="caption" sx={{ fontFamily: "monospace" }}>{fmtPHP(dtl.Gross)}</Typography>
+              </TableCell>
+              <TableCell sx={cellSx} align="right">
+                <Typography variant="caption" sx={{ fontFamily: "monospace", color: "error.main" }}>{fmtPHP(dtl.Discount)}</Typography>
+              </TableCell>
+              <TableCell sx={cellSx} align="right">
+                <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace", color: "success.main" }}>{fmtPHP(dtl.Net)}</Typography>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -297,7 +402,9 @@ export default function TransactionInt() {
               <ReceiptLongIcon fontSize="small" sx={{ color: "text.secondary" }} />
               <Typography variant="subtitle2" fontWeight="bold">Transaction Records</Typography>
               <Chip
-                label={hasFilters ? `${filteredList.length} of ${hdrList.length}` : `${hdrList.length} record${hdrList.length !== 1 ? "s" : ""}`}
+                label={hasFilters
+                  ? `${filteredList.length} of ${hdrList.length}`
+                  : `${hdrList.length} record${hdrList.length !== 1 ? "s" : ""}`}
                 size="small" color="primary" variant="outlined"
                 sx={{ fontSize: "0.7rem", height: 20 }}
               />
@@ -340,8 +447,7 @@ export default function TransactionInt() {
               ))}
             </TextField>
             {hasFilters && (
-              <Button variant="outlined" size="small" color="warning"
-                startIcon={<FilterAltOffIcon />}
+              <Button variant="outlined" size="small" color="warning" startIcon={<FilterAltOffIcon />}
                 onClick={() => { setSearchQuery(""); setStatusFilter("All"); setPage(0); }}>
                 Clear Filters
               </Button>
@@ -357,8 +463,7 @@ export default function TransactionInt() {
                   sx={{ fontSize: "0.7rem", height: 20 }} />
               )}
               {statusFilter !== "All" && (
-                <Chip label={`Status: ${statusFilter}`} size="small"
-                  color={statusColor(statusFilter)}
+                <Chip label={`Status: ${statusFilter}`} size="small" color={statusColor(statusFilter)}
                   onDelete={() => { setStatusFilter("All"); setPage(0); }}
                   sx={{ fontSize: "0.7rem", height: 20 }} />
               )}
@@ -369,7 +474,7 @@ export default function TransactionInt() {
           )}
         </Paper>
 
-        {/* ── Table ── */}
+        {/* ── Main Table ── */}
         <Paper elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
           <TableContainer sx={{ overflowX: "auto", maxHeight: 520 }}>
             <Table stickyHeader size="small">
@@ -387,8 +492,10 @@ export default function TransactionInt() {
                       {hasFilters ? "No results match your filters." : "No transaction records found."}
                     </TableCell>
                   </TableRow>
-                ) : (
-                  paginatedList.map((row, index) => (
+                ) : paginatedList.map((row, index) => {
+                  // Only show combined button if client has 2+ unpaid transactions
+                  const unpaidCount = unpaidClientCount(row.ClientID);
+                  return (
                     <TableRow key={row.id} hover sx={{
                       backgroundColor: index % 2 === 0 ? "transparent" : "action.hover",
                       "&:hover": { backgroundColor: "action.selected" },
@@ -397,14 +504,29 @@ export default function TransactionInt() {
                         {page * rowsPerPage + index + 1}
                       </TableCell>
                       <TableCell sx={cellSx}>{fmtDate(row.TransactionDate)}</TableCell>
-                      <TableCell sx={{ ...cellSx, fontWeight: 600 }}>{clientName(row.ClientID)}</TableCell>
+                      <TableCell sx={{ ...cellSx, fontWeight: 600 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+                          {clientName(row.ClientID)}
+                          {/* ✅ Only show combined chip if there are 2+ unpaid transactions */}
+                          {unpaidCount > 1 && (
+                            <Chip
+                              label={`${unpaidCount} unpaid`}
+                              size="small"
+                              color="info"
+                              variant="outlined"
+                              sx={{ fontSize: "0.62rem", height: 16, cursor: "pointer" }}
+                              onClick={() => handleViewCombinedReceipt(row.ClientID)}
+                            />
+                          )}
+                        </Box>
+                      </TableCell>
                       <TableCell sx={cellSx} title={row.Particulars}>
                         <Box sx={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {row.Particulars || "—"}
                         </Box>
                       </TableCell>
                       <TableCell sx={cellSx} align="right">
-                        <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: "text.primary" }}>
+                        <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace" }}>
                           {fmtPHP(row.GrossTotal)}
                         </Typography>
                       </TableCell>
@@ -419,9 +541,7 @@ export default function TransactionInt() {
                         </Typography>
                       </TableCell>
                       <TableCell sx={cellSx}>
-                        <Chip label={row.Status || "—"} size="small"
-                          color={statusColor(row.Status)}
-                          sx={{ fontSize: "0.72rem" }} />
+                        <Chip label={row.Status || "—"} size="small" color={statusColor(row.Status)} sx={{ fontSize: "0.72rem" }} />
                       </TableCell>
                       <TableCell sx={cellSx} align="center">
                         <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
@@ -430,6 +550,14 @@ export default function TransactionInt() {
                               <ReceiptIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          {/* ✅ Combined receipt action button — only for unpaid */}
+                          {unpaidCount > 1 && (
+                            <Tooltip title={`Combined Receipt (${unpaidCount} unpaid transactions)`}>
+                              <IconButton size="small" color="info" onClick={() => handleViewCombinedReceipt(row.ClientID)}>
+                                <ReceiptLongIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                           <Tooltip title="Edit">
                             <IconButton size="small" onClick={() => handleEdit(row)}>
                               <EditIcon fontSize="small" />
@@ -443,8 +571,8 @@ export default function TransactionInt() {
                         </Box>
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -457,7 +585,7 @@ export default function TransactionInt() {
           />
         </Paper>
 
-        {/* ── Add/Edit Dialog ── */}
+        {/* ── Add / Edit Dialog ── */}
         <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth scroll="paper"
           PaperProps={{ sx: { maxHeight: "95vh", borderRadius: 2 } }}>
           <DialogTitle sx={{
@@ -469,7 +597,7 @@ export default function TransactionInt() {
           }}>
             {isEdit
               ? <EditIcon fontSize="small" sx={{ color: theme.palette.warning.main }} />
-              : <AddIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />}
+              : <AddIcon  fontSize="small" sx={{ color: theme.palette.primary.main }} />}
             <Typography variant="subtitle1" fontWeight="bold"
               sx={{ color: isEdit ? theme.palette.warning.main : theme.palette.primary.main }}>
               {isEdit ? "Edit Transaction" : "New Transaction"}
@@ -482,20 +610,16 @@ export default function TransactionInt() {
 
           <DialogContent dividers sx={{ p: 3 }}>
             <Grid container spacing={2}>
-
-              {/* HDR Section */}
               <Grid item xs={12}>
                 <Typography variant="subtitle2" fontWeight="bold" sx={{ color: "text.secondary" }}>
                   Transaction Header
                 </Typography>
               </Grid>
-
               <Grid item xs={12} sm={4}>
                 <DatePicker label="Transaction Date" value={hdrForm.transactiondate}
                   onChange={(v) => hdrChange("transactiondate", v)}
                   slotProps={{ textField: { fullWidth: true, size: "small" } }} />
               </Grid>
-
               <Grid item xs={12} sm={4}>
                 <TextField label="Client" select fullWidth size="small"
                   value={hdrForm.clientid} onChange={(e) => hdrChange("clientid", e.target.value)}>
@@ -506,7 +630,6 @@ export default function TransactionInt() {
                   ))}
                 </TextField>
               </Grid>
-
               <Grid item xs={12} sm={4}>
                 <TextField label="Status" select fullWidth size="small"
                   value={hdrForm.status} onChange={(e) => hdrChange("status", e.target.value)}>
@@ -515,7 +638,6 @@ export default function TransactionInt() {
                   ))}
                 </TextField>
               </Grid>
-
               <Grid item xs={12}>
                 <TextField label="Particulars / Explanation" fullWidth size="small" multiline rows={2}
                   value={hdrForm.particulars} onChange={(e) => hdrChange("particulars", e.target.value)} />
@@ -528,8 +650,6 @@ export default function TransactionInt() {
                   Service Line Items
                 </Typography>
               </Grid>
-
-              {/* DTL Entry Row */}
               <Grid item xs={12}>
                 <Paper elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
                   <Box sx={{ px: 2, py: 1.2, borderBottom: "1px solid", borderColor: "divider",
@@ -539,13 +659,12 @@ export default function TransactionInt() {
                     display: "flex", alignItems: "center", gap: 1 }}>
                     {dtlEdit
                       ? <EditIcon fontSize="small" sx={{ color: theme.palette.warning.main }} />
-                      : <AddIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />}
+                      : <AddIcon  fontSize="small" sx={{ color: theme.palette.primary.main }} />}
                     <Typography variant="caption" fontWeight="bold"
                       sx={{ color: dtlEdit ? theme.palette.warning.main : theme.palette.primary.main }}>
                       {dtlEdit ? "Edit Line Item" : "Add Line Item"}
                     </Typography>
                   </Box>
-
                   <Box sx={{ p: 2 }}>
                     <Grid container spacing={1.5} alignItems="flex-end">
                       <Grid item xs={12} sm={3}>
@@ -566,14 +685,12 @@ export default function TransactionInt() {
                       </Grid>
                       <Grid item xs={6} sm={1.5}>
                         <TextField label="Rate (₱)" fullWidth size="small" type="number"
-                          value={dtlForm.rate}
-                          onChange={(e) => dtlChange("rate", e.target.value)} />
+                          value={dtlForm.rate} onChange={(e) => dtlChange("rate", e.target.value)} />
                       </Grid>
                       <Grid item xs={6} sm={1}>
                         <TextField label="QTY" fullWidth size="small" type="number"
                           inputProps={{ min: 1, step: 1 }}
-                          value={dtlForm.qty}
-                          onChange={(e) => dtlChange("qty", e.target.value)} />
+                          value={dtlForm.qty} onChange={(e) => dtlChange("qty", e.target.value)} />
                       </Grid>
                       <Grid item xs={6} sm={1.5}>
                         <TextField label="Gross (₱)" fullWidth size="small" type="number"
@@ -581,8 +698,7 @@ export default function TransactionInt() {
                       </Grid>
                       <Grid item xs={6} sm={1.5}>
                         <TextField label="Discount (₱)" fullWidth size="small" type="number"
-                          value={dtlForm.discount}
-                          onChange={(e) => dtlChange("discount", e.target.value)} />
+                          value={dtlForm.discount} onChange={(e) => dtlChange("discount", e.target.value)} />
                       </Grid>
                       <Grid item xs={6} sm={1.5}>
                         <TextField label="Net (₱)" fullWidth size="small" type="number"
@@ -605,7 +721,6 @@ export default function TransactionInt() {
                     </Grid>
                   </Box>
 
-                  {/* DTL Table */}
                   <TableContainer>
                     <Table size="small">
                       <TableHead>
@@ -622,74 +737,53 @@ export default function TransactionInt() {
                               No line items added yet.
                             </TableCell>
                           </TableRow>
-                        ) : (
-                          dtlRows.map((row, i) => (
-                            <TableRow key={row._key} hover sx={{
-                              backgroundColor: i % 2 === 0 ? "transparent" : "action.hover",
-                            }}>
-                              <TableCell sx={{ ...dtlCellSx, color: "text.disabled", width: 40, textAlign: "center" }}>{i + 1}</TableCell>
-                              <TableCell sx={dtlCellSx}>
-                                <Chip label={row.serviceid || row.ServiceID || "—"} size="small" variant="outlined" sx={{ fontSize: "0.7rem" }} />
-                              </TableCell>
-                              <TableCell sx={{ ...dtlCellSx, fontWeight: 600 }}>{row.servicename || row.ServiceName || "—"}</TableCell>
-                              <TableCell sx={dtlCellSx} align="right">
-                                <Typography variant="caption" sx={{ fontFamily: "monospace" }}>
-                                  {fmtPHP(row.rate || row.Rate)}
-                                </Typography>
-                              </TableCell>
-                              <TableCell sx={{ ...dtlCellSx, textAlign: "center" }}>{row.qty || row.QTY}</TableCell>
-                              <TableCell sx={dtlCellSx} align="right">
-                                <Typography variant="caption" sx={{ fontFamily: "monospace" }}>
-                                  {fmtPHP(row.gross || row.Gross)}
-                                </Typography>
-                              </TableCell>
-                              <TableCell sx={dtlCellSx} align="right">
-                                <Typography variant="caption" sx={{ fontFamily: "monospace", color: "error.main" }}>
-                                  {fmtPHP(row.discount || row.Discount)}
-                                </Typography>
-                              </TableCell>
-                              <TableCell sx={dtlCellSx} align="right">
-                                <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace", color: "success.main" }}>
-                                  {fmtPHP(row.net || row.Net)}
-                                </Typography>
-                              </TableCell>
-                              <TableCell sx={dtlCellSx} align="center">
-                                <Box sx={{ display: "flex", gap: 0.3 }}>
-                                  <Tooltip title="Edit line">
-                                    <IconButton size="small" onClick={() => editDtlRow(row)}>
-                                      <EditIcon sx={{ fontSize: 13 }} />
-                                    </IconButton>
-                                  </Tooltip>
-                                  <Tooltip title="Remove line">
-                                    <IconButton size="small" color="error" onClick={() => removeDtlRow(row)}>
-                                      <DeleteIcon sx={{ fontSize: 13 }} />
-                                    </IconButton>
-                                  </Tooltip>
-                                </Box>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                        {/* Totals row */}
+                        ) : dtlRows.map((row, i) => (
+                          <TableRow key={row._key} hover sx={{ backgroundColor: i % 2 === 0 ? "transparent" : "action.hover" }}>
+                            <TableCell sx={{ ...dtlCellSx, color: "text.disabled", width: 40, textAlign: "center" }}>{i + 1}</TableCell>
+                            <TableCell sx={dtlCellSx}>
+                              <Chip label={row.serviceid || row.ServiceID || "—"} size="small" variant="outlined" sx={{ fontSize: "0.7rem" }} />
+                            </TableCell>
+                            <TableCell sx={{ ...dtlCellSx, fontWeight: 600 }}>{row.servicename || row.ServiceName || "—"}</TableCell>
+                            <TableCell sx={dtlCellSx} align="right">
+                              <Typography variant="caption" sx={{ fontFamily: "monospace" }}>{fmtPHP(row.rate || row.Rate)}</Typography>
+                            </TableCell>
+                            <TableCell sx={{ ...dtlCellSx, textAlign: "center" }}>{row.qty || row.QTY}</TableCell>
+                            <TableCell sx={dtlCellSx} align="right">
+                              <Typography variant="caption" sx={{ fontFamily: "monospace" }}>{fmtPHP(row.gross || row.Gross)}</Typography>
+                            </TableCell>
+                            <TableCell sx={dtlCellSx} align="right">
+                              <Typography variant="caption" sx={{ fontFamily: "monospace", color: "error.main" }}>{fmtPHP(row.discount || row.Discount)}</Typography>
+                            </TableCell>
+                            <TableCell sx={dtlCellSx} align="right">
+                              <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace", color: "success.main" }}>{fmtPHP(row.net || row.Net)}</Typography>
+                            </TableCell>
+                            <TableCell sx={dtlCellSx} align="center">
+                              <Box sx={{ display: "flex", gap: 0.3 }}>
+                                <Tooltip title="Edit line">
+                                  <IconButton size="small" onClick={() => editDtlRow(row)}>
+                                    <EditIcon sx={{ fontSize: 13 }} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Remove line">
+                                  <IconButton size="small" color="error" onClick={() => removeDtlRow(row)}>
+                                    <DeleteIcon sx={{ fontSize: 13 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                         {dtlRows.length > 0 && (
                           <TableRow sx={{ backgroundColor: darkMode ? alpha("#fff", 0.04) : alpha("#000", 0.03) }}>
-                            <TableCell colSpan={5} sx={{ ...dtlCellSx, fontWeight: "bold", fontSize: "0.78rem" }}>
-                              TOTALS
+                            <TableCell colSpan={5} sx={{ ...dtlCellSx, fontWeight: "bold", fontSize: "0.78rem" }}>TOTALS</TableCell>
+                            <TableCell sx={dtlCellSx} align="right">
+                              <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace" }}>{fmtPHP(hdrForm.grosstotal)}</Typography>
                             </TableCell>
                             <TableCell sx={dtlCellSx} align="right">
-                              <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace" }}>
-                                {fmtPHP(hdrForm.grosstotal)}
-                              </Typography>
+                              <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace", color: "error.main" }}>{fmtPHP(hdrForm.discount)}</Typography>
                             </TableCell>
                             <TableCell sx={dtlCellSx} align="right">
-                              <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace", color: "error.main" }}>
-                                {fmtPHP(hdrForm.discount)}
-                              </Typography>
-                            </TableCell>
-                            <TableCell sx={dtlCellSx} align="right">
-                              <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace", color: "success.main" }}>
-                                {fmtPHP(hdrForm.nettotal)}
-                              </Typography>
+                              <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace", color: "success.main" }}>{fmtPHP(hdrForm.nettotal)}</Typography>
                             </TableCell>
                             <TableCell sx={dtlCellSx} />
                           </TableRow>
@@ -700,13 +794,10 @@ export default function TransactionInt() {
                 </Paper>
               </Grid>
 
-              {/* HDR Totals Summary */}
+              {/* Summary */}
               <Grid item xs={12}>
                 <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                  <Paper elevation={0} sx={{
-                    border: "1px solid", borderColor: "divider", borderRadius: 2,
-                    p: 2, minWidth: 280,
-                  }}>
+                  <Paper elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 2, minWidth: 280 }}>
                     <Typography variant="subtitle2" fontWeight="bold" sx={{ color: "text.secondary", mb: 1.5 }}>
                       Transaction Summary
                     </Typography>
@@ -717,23 +808,19 @@ export default function TransactionInt() {
                     ].map(({ label, value, color }) => (
                       <Box key={label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: 0.5 }}>
                         <Typography variant="body2" color="text.secondary">{label}</Typography>
-                        <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color }}>
-                          {fmtPHP(value)}
-                        </Typography>
+                        <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color }}>{fmtPHP(value)}</Typography>
                       </Box>
                     ))}
                     <Divider sx={{ my: 1 }} />
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <Typography variant="subtitle2" fontWeight="bold">NET TOTAL</Typography>
-                      <Typography variant="subtitle1" fontWeight="bold"
-                        sx={{ fontFamily: "monospace", color: "success.main" }}>
+                      <Typography variant="subtitle1" fontWeight="bold" sx={{ fontFamily: "monospace", color: "success.main" }}>
                         {fmtPHP(hdrForm.nettotal)}
                       </Typography>
                     </Box>
                   </Paper>
                 </Box>
               </Grid>
-
             </Grid>
           </DialogContent>
 
@@ -745,43 +832,65 @@ export default function TransactionInt() {
           </DialogActions>
         </Dialog>
 
-        {/* ── Receipt Dialog ── */}
-        <Dialog open={receiptOpen} onClose={() => setReceiptOpen(false)} maxWidth="sm" fullWidth
+        {/* ── Receipt Dialog (Single + Combined) ── */}
+        <Dialog open={receiptOpen} onClose={() => setReceiptOpen(false)} maxWidth="md" fullWidth
           PaperProps={{ sx: { borderRadius: 2 } }}>
           <DialogTitle sx={{
             borderBottom: "1px solid", borderColor: "divider",
             display: "flex", alignItems: "center", justifyContent: "space-between",
           }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <ReceiptIcon fontSize="small" color="primary" />
-              <Typography variant="subtitle1" fontWeight="bold">Transaction Receipt</Typography>
+              {receiptMode === "combined"
+                ? <ReceiptLongIcon fontSize="small" color="info" />
+                : <ReceiptIcon fontSize="small" color="primary" />}
+              <Typography variant="subtitle1" fontWeight="bold">
+                {receiptMode === "combined"
+                  ? `Combined Receipt — ${receiptClient?.name}`
+                  : "Transaction Receipt"}
+              </Typography>
+              {receiptMode === "combined" && (
+                <Chip
+                  label={`${receiptGroups.length} unpaid transaction${receiptGroups.length !== 1 ? "s" : ""}`}
+                  size="small" color="info" variant="outlined"
+                  sx={{ fontSize: "0.7rem", height: 20 }}
+                />
+              )}
             </Box>
-            <Tooltip title="Print Receipt">
-              <IconButton size="small" onClick={handlePrint}>
-                <PrintIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              {/* ✅ Only show Combined button from single view if client has unpaid transactions */}
+              {receiptMode === "single" && unpaidClientCount(receiptData?.ClientID) > 1 && (
+                <Tooltip title="View combined receipt for all unpaid transactions of this client">
+                  <Button size="small" variant="outlined" color="info"
+                    startIcon={<ReceiptLongIcon fontSize="small" />}
+                    onClick={() => handleViewCombinedReceipt(receiptData.ClientID)}
+                    sx={{ fontSize: "0.72rem" }}>
+                    Combined
+                  </Button>
+                </Tooltip>
+              )}
+              <Tooltip title="Print Receipt">
+                <IconButton size="small" onClick={handlePrint}><PrintIcon fontSize="small" /></IconButton>
+              </Tooltip>
+            </Box>
           </DialogTitle>
 
           <DialogContent sx={{ p: 3 }}>
             <Box ref={printRef}>
-              {receiptData && (
+
+              {/* ── SINGLE RECEIPT ── */}
+              {receiptMode === "single" && receiptData && (
                 <>
-                  {/* Receipt Header */}
                   <Box sx={{ textAlign: "center", mb: 2 }}>
                     <Typography variant="h6" fontWeight="bold">OFFICIAL RECEIPT</Typography>
                     <Typography variant="caption" color="text.secondary">Transaction Record</Typography>
                   </Box>
-
                   <Divider sx={{ mb: 2 }} />
-
-                  {/* Info Grid */}
                   <Grid container spacing={1.5} sx={{ mb: 2 }}>
                     {[
                       { label: "Transaction ID", value: `#${receiptData.ID}` },
-                      { label: "Date", value: fmtDate(receiptData.TransactionDate) },
-                      { label: "Client", value: clientName(receiptData.ClientID) },
-                      { label: "Status", value: receiptData.Status },
+                      { label: "Date",           value: fmtDate(receiptData.TransactionDate) },
+                      { label: "Client",         value: clientName(receiptData.ClientID) },
+                      { label: "Status",         value: receiptData.Status },
                     ].map(({ label, value }) => (
                       <Grid item xs={6} key={label}>
                         <Typography variant="caption" color="text.secondary"
@@ -789,9 +898,9 @@ export default function TransactionInt() {
                           {label}
                         </Typography>
                         <Typography variant="body2" fontWeight={600}>
-                          {label === "Status" ? (
-                            <Chip label={value} size="small" color={statusColor(value)} sx={{ fontSize: "0.7rem" }} />
-                          ) : value}
+                          {label === "Status"
+                            ? <Chip label={value} size="small" color={statusColor(value)} sx={{ fontSize: "0.7rem" }} />
+                            : value}
                         </Typography>
                       </Grid>
                     ))}
@@ -803,74 +912,25 @@ export default function TransactionInt() {
                       <Typography variant="body2">{receiptData.Particulars || "—"}</Typography>
                     </Grid>
                   </Grid>
-
                   <Divider sx={{ mb: 1.5 }} />
-
-                  {/* Line Items */}
                   <Typography variant="caption" fontWeight="bold" color="text.secondary"
                     sx={{ textTransform: "uppercase", letterSpacing: "0.05em", display: "block", mb: 1 }}>
                     Service Details
                   </Typography>
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          {["Service", "Rate", "QTY", "Gross", "Disc.", "Net"].map((h) => (
-                            <TableCell key={h} sx={{
-                              ...headerSx, py: 0.8,
-                              backgroundColor: darkMode ? "#1a2a3a" : "#1a3a5c",
-                              color: "#fff",
-                            }}>{h}</TableCell>
-                          ))}
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {receiptDtls.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={6} align="center" sx={{ py: 2, color: "text.secondary", fontSize: "0.8rem" }}>
-                              No line items.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          receiptDtls.map((dtl, i) => (
-                            <TableRow key={dtl.ID || i} sx={{
-                              backgroundColor: i % 2 === 0 ? "transparent" : "action.hover",
-                            }}>
-                              <TableCell sx={{ ...cellSx, fontWeight: 600 }}>{dtl.ServiceName || "—"}</TableCell>
-                              <TableCell sx={cellSx} align="right">
-                                <Typography variant="caption" sx={{ fontFamily: "monospace" }}>{fmtPHP(dtl.Rate)}</Typography>
-                              </TableCell>
-                              <TableCell sx={{ ...cellSx, textAlign: "center" }}>{dtl.QTY}</TableCell>
-                              <TableCell sx={cellSx} align="right">
-                                <Typography variant="caption" sx={{ fontFamily: "monospace" }}>{fmtPHP(dtl.Gross)}</Typography>
-                              </TableCell>
-                              <TableCell sx={cellSx} align="right">
-                                <Typography variant="caption" sx={{ fontFamily: "monospace", color: "error.main" }}>{fmtPHP(dtl.Discount)}</Typography>
-                              </TableCell>
-                              <TableCell sx={cellSx} align="right">
-                                <Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace", color: "success.main" }}>{fmtPHP(dtl.Net)}</Typography>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-
-                  {/* Totals */}
+                  <ReceiptDtlTable dtls={receiptDtls} />
                   <Box sx={{ mt: 2, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5 }}>
                     <Divider sx={{ width: "100%", mb: 1 }} />
                     {[
                       { label: "Gross Total", value: receiptData.GrossTotal, color: "text.primary" },
                       { label: "Discount",    value: receiptData.Discount,   color: "error.main" },
                     ].map(({ label, value, color }) => (
-                      <Box key={label} sx={{ display: "flex", justifyContent: "space-between", width: 240 }}>
+                      <Box key={label} sx={{ display: "flex", justifyContent: "space-between", width: 260 }}>
                         <Typography variant="body2" color="text.secondary">{label}</Typography>
                         <Typography variant="body2" sx={{ fontFamily: "monospace", color }}>{fmtPHP(value)}</Typography>
                       </Box>
                     ))}
-                    <Divider sx={{ width: 240, my: 0.5 }} />
-                    <Box sx={{ display: "flex", justifyContent: "space-between", width: 240 }}>
+                    <Divider sx={{ width: 260, my: 0.5 }} />
+                    <Box sx={{ display: "flex", justifyContent: "space-between", width: 260 }}>
                       <Typography variant="subtitle2" fontWeight="bold">NET TOTAL</Typography>
                       <Typography variant="subtitle2" fontWeight="bold"
                         sx={{ fontFamily: "monospace", color: "success.main" }}>
@@ -878,7 +938,6 @@ export default function TransactionInt() {
                       </Typography>
                     </Box>
                   </Box>
-
                   <Divider sx={{ mt: 2, mb: 1.5 }} />
                   <Typography variant="caption" color="text.secondary"
                     sx={{ display: "block", textAlign: "center", fontStyle: "italic" }}>
@@ -886,11 +945,123 @@ export default function TransactionInt() {
                   </Typography>
                 </>
               )}
+
+              {/* ── COMBINED RECEIPT ── */}
+              {receiptMode === "combined" && (
+                <>
+                  <Box sx={{ textAlign: "center", mb: 2 }}>
+                    <Typography variant="h6" fontWeight="bold">COMBINED OFFICIAL RECEIPT</Typography>
+                    <Typography variant="body2" fontWeight={600} sx={{ mt: 0.5 }}>{receiptClient?.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Unpaid / Partial Transactions — {receiptGroups.length} record{receiptGroups.length !== 1 ? "s" : ""}
+                    </Typography>
+                  </Box>
+                  <Divider sx={{ mb: 2 }} />
+
+                  {receiptGroups.length === 0 ? (
+                    <Box sx={{ py: 4, textAlign: "center" }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Loading transactions… (or all transactions are fully paid)
+                      </Typography>
+                    </Box>
+                  ) : (
+                    receiptGroups.map((group, gi) => (
+                      <Box key={group.hdr.ID || gi} sx={{ mb: 3 }}>
+                        <Box sx={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          flexWrap: "wrap", gap: 1,
+                          px: 1.5, py: 1,
+                          backgroundColor: darkMode ? alpha("#fff", 0.05) : alpha("#1a3a5c", 0.07),
+                          borderRadius: 1, mb: 1,
+                        }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                            <Typography variant="caption" fontWeight="bold" sx={{ color: "text.secondary" }}>
+                              TXN #{group.hdr.ID}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                              {fmtDate(group.hdr.TransactionDate)}
+                            </Typography>
+                            <Chip label={group.hdr.Status || "—"} size="small"
+                              color={statusColor(group.hdr.Status)} sx={{ fontSize: "0.65rem", height: 18 }} />
+                          </Box>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontStyle: "italic", maxWidth: 300,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {group.hdr.Particulars || "—"}
+                          </Typography>
+                        </Box>
+
+                        <ReceiptDtlTable dtls={group.dtls} />
+
+                        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 0.5, gap: 3, flexWrap: "wrap", pr: 1 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Gross: <strong style={{ fontFamily: "monospace" }}>{fmtPHP(group.hdr.GrossTotal)}</strong>
+                          </Typography>
+                          <Typography variant="caption" color="error.main">
+                            Discount: <strong style={{ fontFamily: "monospace" }}>{fmtPHP(group.hdr.Discount)}</strong>
+                          </Typography>
+                          <Typography variant="caption" color="success.main">
+                            Net: <strong style={{ fontFamily: "monospace" }}>{fmtPHP(group.hdr.NetTotal)}</strong>
+                          </Typography>
+                        </Box>
+
+                        {gi < receiptGroups.length - 1 && <Divider sx={{ mt: 2 }} />}
+                      </Box>
+                    ))
+                  )}
+
+                  {receiptGroups.length > 0 && (
+                    <>
+                      <Divider sx={{ my: 1.5 }} />
+                      <Box sx={{
+                        display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5,
+                        backgroundColor: darkMode ? alpha("#fff", 0.04) : alpha("#1a3a5c", 0.05),
+                        borderRadius: 2, p: 2,
+                      }}>
+                        <Typography variant="subtitle2" fontWeight="bold" sx={{ color: "text.secondary", alignSelf: "flex-start" }}>
+                          GRAND TOTAL — {receiptClient?.name}
+                        </Typography>
+                        <Divider sx={{ width: "100%", my: 0.5 }} />
+                        {[
+                          { label: "Total Gross",    value: combinedGross,    color: "text.primary" },
+                          { label: "Total Discount", value: combinedDiscount, color: "error.main" },
+                        ].map(({ label, value, color }) => (
+                          <Box key={label} sx={{ display: "flex", justifyContent: "space-between", width: 300 }}>
+                            <Typography variant="body2" color="text.secondary">{label}</Typography>
+                            <Typography variant="body2" sx={{ fontFamily: "monospace", color }}>{fmtPHP(value)}</Typography>
+                          </Box>
+                        ))}
+                        <Divider sx={{ width: 300, my: 0.5 }} />
+                        <Box sx={{ display: "flex", justifyContent: "space-between", width: 300 }}>
+                          <Typography variant="subtitle1" fontWeight="bold">TOTAL NET</Typography>
+                          <Typography variant="subtitle1" fontWeight="bold"
+                            sx={{ fontFamily: "monospace", color: "success.main" }}>
+                            {fmtPHP(combinedNet)}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Divider sx={{ mt: 2, mb: 1.5 }} />
+                      <Typography variant="caption" color="text.secondary"
+                        sx={{ display: "block", textAlign: "center", fontStyle: "italic" }}>
+                        This combined receipt covers all outstanding transactions for {receiptClient?.name}. Thank you.
+                      </Typography>
+                    </>
+                  )}
+                </>
+              )}
+
             </Box>
           </DialogContent>
 
           <DialogActions sx={{ borderTop: "1px solid", borderColor: "divider", p: 2, gap: 1 }}>
             <Button onClick={() => setReceiptOpen(false)}>Close</Button>
+            {receiptMode === "single" && unpaidClientCount(receiptData?.ClientID) > 1 && (
+              <Button variant="outlined" color="info"
+                startIcon={<ReceiptLongIcon />}
+                onClick={() => handleViewCombinedReceipt(receiptData.ClientID)}>
+                View Combined Receipt
+              </Button>
+            )}
             <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint}>
               Print Receipt
             </Button>
