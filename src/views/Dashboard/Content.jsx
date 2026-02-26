@@ -16,6 +16,9 @@ import {
   Chip,
   useTheme,
   alpha,
+  Divider,
+  Badge,
+  Collapse,
 } from "@mui/material";
 import React, { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../modules/context/AuthContext";
@@ -33,6 +36,225 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import PeopleIcon from "@mui/icons-material/People";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import NotificationsIcon from "@mui/icons-material/Notifications";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
+import BeachAccessIcon from "@mui/icons-material/BeachAccess";
+
+// ── Helper: convert total months to friendly label ────────────
+const monthsToLabel = (totalMonths) => {
+  const m = parseInt(totalMonths);
+  if (!m) return "—";
+  if (m < 12) return `${m} month${m !== 1 ? "s" : ""}`;
+  const years = Math.floor(m / 12);
+  const months = m % 12;
+  if (months === 0) return `${years} year${years !== 1 ? "s" : ""}`;
+  return `${years} yr${years !== 1 ? "s" : ""} ${months} mo${months !== 1 ? "s" : ""}`;
+};
+
+// ── Notification Category Config ────────────────────────────────
+const NOTIFICATION_CATEGORIES = {
+  SERVICE_EXPIRY: {
+    key: "service_expiry",
+    label: "Service Expirations",
+    icon: <WarningAmberIcon fontSize="small" />,
+    color: "#f59e0b",
+    bgLight: "#fffbeb",
+    bgDark: "rgba(245,158,11,0.1)",
+    borderColor: "#fcd34d",
+  },
+  BILLING: {
+    key: "billing",
+    label: "Billing Due",
+    icon: <ReceiptLongIcon fontSize="small" />,
+    color: "#3b82f6",
+    bgLight: "#eff6ff",
+    bgDark: "rgba(59,130,246,0.1)",
+    borderColor: "#93c5fd",
+  },
+  HR_APPROVALS: {
+    key: "hr_approvals",
+    label: "HR Approvals",
+    icon: <AssignmentTurnedInIcon fontSize="small" />,
+    color: "#8b5cf6",
+    bgLight: "#f5f3ff",
+    bgDark: "rgba(139,92,246,0.1)",
+    borderColor: "#c4b5fd",
+  },
+};
+
+// ── Single Notification Item ────────────────────────────────────
+function NotificationItem({ notification, darkMode, isLast }) {
+  const urgencyColor =
+    notification.urgency === "critical"
+      ? "#ef4444"
+      : notification.urgency === "high"
+      ? "#f59e0b"
+      : notification.urgency === "medium"
+      ? "#3b82f6"
+      : "#6b7280";
+
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 1.5,
+        py: 1.25,
+        px: 1.5,
+        borderRadius: 1,
+        mb: isLast ? 0 : 0.5,
+        backgroundColor: darkMode
+          ? "rgba(255,255,255,0.03)"
+          : "rgba(0,0,0,0.015)",
+        border: `1px solid ${darkMode ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`,
+        transition: "background-color 0.15s",
+        "&:hover": {
+          backgroundColor: darkMode
+            ? "rgba(255,255,255,0.06)"
+            : "rgba(0,0,0,0.035)",
+        },
+      }}
+    >
+      {/* Urgency dot */}
+      <Box
+        sx={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          backgroundColor: urgencyColor,
+          mt: 0.7,
+          flexShrink: 0,
+          boxShadow: `0 0 6px ${urgencyColor}88`,
+        }}
+      />
+      <Typography
+        variant="body2"
+        sx={{
+          color: darkMode ? "#e5e7eb" : "#374151",
+          lineHeight: 1.5,
+          flex: 1,
+          fontSize: "0.8125rem",
+        }}
+      >
+        {notification.text}
+      </Typography>
+      {notification.badge && (
+        <Chip
+          label={notification.badge}
+          size="small"
+          sx={{
+            height: 18,
+            fontSize: "0.65rem",
+            fontWeight: 700,
+            backgroundColor: urgencyColor,
+            color: "#fff",
+            flexShrink: 0,
+          }}
+        />
+      )}
+    </Box>
+  );
+}
+
+// ── Notification Category Panel ─────────────────────────────────
+function NotificationCategoryPanel({ category, items, darkMode }) {
+  const [expanded, setExpanded] = useState(true);
+  const cfg = NOTIFICATION_CATEGORIES[category];
+  const bgColor = darkMode ? cfg.bgDark : cfg.bgLight;
+  const borderColor = darkMode
+    ? cfg.color + "44"
+    : cfg.borderColor;
+
+  if (items.length === 0) return null;
+
+  return (
+    <Box
+      sx={{
+        border: `1px solid ${borderColor}`,
+        borderRadius: 2,
+        overflow: "hidden",
+        backgroundColor: bgColor,
+      }}
+    >
+      {/* Category Header */}
+      <Box
+        onClick={() => setExpanded((p) => !p)}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          px: 2,
+          py: 1.25,
+          cursor: "pointer",
+          borderBottom: expanded
+            ? `1px solid ${borderColor}`
+            : "none",
+          backgroundColor: darkMode
+            ? cfg.color + "22"
+            : cfg.color + "18",
+          userSelect: "none",
+          "&:hover": {
+            backgroundColor: darkMode
+              ? cfg.color + "33"
+              : cfg.color + "25",
+          },
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box sx={{ color: cfg.color, display: "flex", alignItems: "center" }}>
+            {cfg.icon}
+          </Box>
+          <Typography
+            variant="subtitle2"
+            fontWeight={700}
+            sx={{ color: cfg.color, fontSize: "0.8125rem", letterSpacing: 0.3 }}
+          >
+            {cfg.label.toUpperCase()}
+          </Typography>
+          <Chip
+            label={items.length}
+            size="small"
+            sx={{
+              height: 18,
+              fontSize: "0.65rem",
+              fontWeight: 700,
+              backgroundColor: cfg.color,
+              color: "#fff",
+              minWidth: 22,
+            }}
+          />
+        </Box>
+        <Box sx={{ color: cfg.color, display: "flex", alignItems: "center" }}>
+          {expanded ? (
+            <ExpandLessIcon fontSize="small" />
+          ) : (
+            <ExpandMoreIcon fontSize="small" />
+          )}
+        </Box>
+      </Box>
+
+      {/* Items */}
+      <Collapse in={expanded}>
+        <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 0 }}>
+          {items.map((item, idx) => (
+            <NotificationItem
+              key={idx}
+              notification={item}
+              darkMode={darkMode}
+              isLast={idx === items.length - 1}
+            />
+          ))}
+        </Box>
+      </Collapse>
+    </Box>
+  );
+}
 
 export default function Content() {
   const theme = useTheme();
@@ -52,6 +274,9 @@ export default function Content() {
   const { data: OT } = hookContainer("/get-approval-ot");
   const { data: otherDeductions } = hookContainer("/get-approval-otherDeductions");
   const { data: loans } = hookContainer("/get-approval-loans");
+
+  const { data: servicesAvailedRaw } = hookContainer("/selectservicesavailed");
+  const { data: allClientsRaw } = hookContainer("/selectclientss");
 
   console.log("accessToken:", accessToken);
 
@@ -103,7 +328,6 @@ export default function Content() {
     ? WorkForceSummary?.data?.map((row) => ({ ...row }))
     : [];
 
-  // Fetch client statistics from backend
   const { data: clientData } = hookContainer("/get-clients-summary");
 
   const [payPeriod, setPayPeriod] = useState({
@@ -147,7 +371,6 @@ export default function Content() {
     0
   );
 
-  // Client stats — reads from real backend, no hardcoded fallbacks, others removed
   const clientStats = {
     total: clientData?.data?.total || 0,
     active: clientData?.data?.active || 0,
@@ -157,7 +380,6 @@ export default function Content() {
     coop: clientData?.data?.coop || 0,
   };
 
-  // Percentages — guard against divide by zero
   const activePercentage =
     clientStats.total > 0
       ? ((clientStats.active / clientStats.total) * 100).toFixed(1)
@@ -190,13 +412,11 @@ export default function Content() {
     gray: darkMode ? "#78909c" : "#607d8b",
   };
 
-  // Chart data — Active vs Inactive
   const clientStatusData = [
     { id: 0, value: clientStats.active, label: "Active Clients", color: chartColors.active },
     { id: 1, value: clientStats.inactive, label: "Inactive Clients", color: chartColors.inactive },
   ];
 
-  // Chart data — 3 types only, others removed
   const clientTypeData = [
     { id: 0, value: clientStats.soleProprietor, label: "Sole Proprietor", color: chartColors.primary },
     { id: 1, value: clientStats.corporation, label: "Corporation", color: chartColors.purple },
@@ -214,7 +434,7 @@ export default function Content() {
     const exportData = {
       date: dayjs().format("YYYY-MM-DD"),
       clientStats,
-      notifications,
+      categorizedNotifications,
     };
     const dataStr = JSON.stringify(exportData, null, 2);
     const dataBlob = new Blob([dataStr], { type: "application/json" });
@@ -230,26 +450,156 @@ export default function Content() {
     setChartType((prev) => (prev === "pie" ? "bar" : "pie"));
   };
 
-  const notifications = [
+  // ── Build Notifications (Categorized) ───────────────────────────
+
+  const today = dayjs();
+
+  // 1. Service Expiration Notifications (within 7 days)
+  const servicesAvailedList = Array.isArray(servicesAvailedRaw?.data)
+    ? servicesAvailedRaw.data
+    : Array.isArray(servicesAvailedRaw)
+    ? servicesAvailedRaw
+    : [];
+
+  const latestPerClientService = {};
+  servicesAvailedList.forEach((row) => {
+    if (!row.TransactionDate || !row.ServiceRenewalMonths) return;
+    const key = `${row.ClientID}__${row.ServiceName}`;
+    const existing = latestPerClientService[key];
+    if (
+      !existing ||
+      dayjs(row.TransactionDate).isAfter(dayjs(existing.TransactionDate))
+    ) {
+      latestPerClientService[key] = row;
+    }
+  });
+
+  const serviceExpiryNotifications = Object.values(latestPerClientService)
+    .map((row) => {
+      const expirationDate = dayjs(row.TransactionDate).add(
+        parseInt(row.ServiceRenewalMonths),
+        "month"
+      );
+      const daysUntil = expirationDate.diff(today, "day");
+      return { ...row, expirationDate, daysUntil };
+    })
+    .filter(({ daysUntil }) => daysUntil >= 0 && daysUntil <= 7)
+    .sort((a, b) => a.daysUntil - b.daysUntil)
+    .map(({ ClientName, ServiceName, ServiceRenewalMonths, expirationDate, daysUntil }) => {
+      const label =
+        daysUntil === 0
+          ? "TODAY"
+          : `in ${daysUntil} day${daysUntil !== 1 ? "s" : ""}`;
+      return {
+        text: `"${ServiceName}" for ${ClientName} — ${monthsToLabel(ServiceRenewalMonths)} renewal expires ${expirationDate.format("MMM D, YYYY")}`,
+        badge: daysUntil === 0 ? "TODAY" : `${daysUntil}d`,
+        urgency: daysUntil === 0 ? "critical" : daysUntil <= 3 ? "high" : "medium",
+      };
+    });
+
+  // 2. Billing Notifications
+  const allClientsList = Array.isArray(allClientsRaw?.data)
+    ? allClientsRaw.data
+    : Array.isArray(allClientsRaw)
+    ? allClientsRaw
+    : [];
+
+  const currentMonth = today.month();
+  const isQuarterEndMonth = [2, 5, 8, 11].includes(currentMonth);
+  const isSemiAnnualEndMonth = [5, 11].includes(currentMonth);
+
+  const billingNotifications = allClientsList
+    .filter((client) => {
+      if (client.Status !== "Active") return false;
+      const rt = client.RetentionType;
+      if (rt === "Monthly") return true;
+      if (rt === "Quarterly" && isQuarterEndMonth) return true;
+      if (rt === "Semi Annual" && isSemiAnnualEndMonth) return true;
+      return false;
+    })
+    .map((client) => {
+      const cycleLabel =
+        client.RetentionType === "Monthly"
+          ? "Monthly"
+          : client.RetentionType === "Quarterly"
+          ? "Quarterly"
+          : "Semi-Annual";
+      return {
+        text: `${client.TradeName || client.LNF} — ${cycleLabel} billing due end of ${today.format("MMMM YYYY")}`,
+        badge: cycleLabel,
+        urgency: "medium",
+      };
+    });
+
+  // 3. HR Approval Notifications
+  const hrApprovalNotifications = [
     ...(VLList.length > 0
-      ? [{ text: `${VLList.length} Vacation Leave request(s) pending approval` }]
+      ? [{
+          text: `${VLList.length} Vacation Leave request${VLList.length !== 1 ? "s" : ""} pending approval`,
+          badge: `${VLList.length}`,
+          urgency: "high",
+        }]
       : []),
     ...(OTList.length > 0
-      ? [{ text: `${OTList.length} Overtime request(s) pending approval` }]
+      ? [{
+          text: `${OTList.length} Overtime request${OTList.length !== 1 ? "s" : ""} pending approval`,
+          badge: `${OTList.length}`,
+          urgency: "medium",
+        }]
       : []),
     ...(loanList.length > 0
-      ? [{ text: `${loanList.length} Loan application(s) pending approval` }]
+      ? [{
+          text: `${loanList.length} Loan application${loanList.length !== 1 ? "s" : ""} pending approval`,
+          badge: `${loanList.length}`,
+          urgency: "medium",
+        }]
       : []),
     ...(AbsentList.length > 0
-      ? [{ text: `${AbsentList.length} Absence report(s) pending approval` }]
+      ? [{
+          text: `${AbsentList.length} Absence report${AbsentList.length !== 1 ? "s" : ""} pending approval`,
+          badge: `${AbsentList.length}`,
+          urgency: "medium",
+        }]
       : []),
-    { text: `Tax Clearance will expire on ${dayjs().add(1, "day").format("MMMM D, YYYY")}` },
-    { text: `Upcoming payment is set for ${dayjs().format("MMMM D, YYYY")}` },
+    ...(OTOffList.length > 0
+      ? [{
+          text: `${OTOffList.length} OT-Off request${OTOffList.length !== 1 ? "s" : ""} pending approval`,
+          badge: `${OTOffList.length}`,
+          urgency: "low",
+        }]
+      : []),
+    ...(BackPayList.length > 0
+      ? [{
+          text: `${BackPayList.length} Back Pay request${BackPayList.length !== 1 ? "s" : ""} pending approval`,
+          badge: `${BackPayList.length}`,
+          urgency: "low",
+        }]
+      : []),
+    ...(otherDeductionList.length > 0
+      ? [{
+          text: `${otherDeductionList.length} Other Deduction request${otherDeductionList.length !== 1 ? "s" : ""} pending approval`,
+          badge: `${otherDeductionList.length}`,
+          urgency: "low",
+        }]
+      : []),
   ];
 
-  const chartSetting = {
-    xAxis: [{ label: "Employees Hired", min: 0, tickInterval: 2 }],
+  // Categorized Map
+  const categorizedNotifications = {
+    SERVICE_EXPIRY: serviceExpiryNotifications,
+    BILLING: billingNotifications,
+    HR_APPROVALS: hrApprovalNotifications,
   };
+
+  const totalNotifications =
+    serviceExpiryNotifications.length +
+    billingNotifications.length +
+    hrApprovalNotifications.length;
+
+  const criticalCount = [
+    ...serviceExpiryNotifications,
+    ...hrApprovalNotifications,
+  ].filter((n) => n.urgency === "critical").length;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -355,7 +705,6 @@ export default function Content() {
                 as of {dayjs().format("MMMM D, YYYY")}
               </Typography>
 
-              {/* Active/Inactive Breakdown */}
               <Box sx={{ width: "100%", mt: 2 }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -392,7 +741,6 @@ export default function Content() {
             }}
           >
             <CardContent sx={{ p: 3 }}>
-              {/* Chart Controls */}
               <Box
                 sx={{
                   display: "flex",
@@ -425,7 +773,6 @@ export default function Content() {
                 </Box>
               </Box>
 
-              {/* Chart */}
               <Box
                 sx={{
                   display: "flex",
@@ -482,7 +829,6 @@ export default function Content() {
                 )}
               </Box>
 
-              {/* Client Types Breakdown — 3 cards only, others removed */}
               <Box sx={{ mt: 3, mb: 2 }}>
                 <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1, color: colors.text }}>
                   Client Types Breakdown
@@ -545,7 +891,6 @@ export default function Content() {
                 </Grid>
               </Grid>
 
-              {/* Quick Action Buttons */}
               <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
                 <Button
                   variant="outlined"
@@ -570,7 +915,7 @@ export default function Content() {
         </Grid>
       </Grid>
 
-      {/* Notifications Section */}
+      {/* ── NOTIFICATIONS SECTION (Redesigned) ─────────────────────── */}
       <Paper
         elevation={0}
         sx={{
@@ -578,47 +923,106 @@ export default function Content() {
           backgroundColor: colors.sectionBg,
           border: `1px solid ${colors.sectionBorder}`,
           borderRadius: 2,
-          minHeight: 200,
         }}
       >
+        {/* Section Header */}
         <Box
           sx={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            mb: 2,
+            mb: 2.5,
           }}
         >
-          <Typography variant="h6" fontWeight="bold" sx={{ color: colors.text }}>
-            Notifications
-          </Typography>
-          <Chip label={`${notifications.length} items`} size="small" color="primary" />
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Badge badgeContent={criticalCount} color="error">
+              <NotificationsIcon sx={{ color: colors.text, fontSize: 24 }} />
+            </Badge>
+            <Typography variant="h6" fontWeight="bold" sx={{ color: colors.text }}>
+              Notifications
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            {criticalCount > 0 && (
+              <Chip
+                label={`${criticalCount} Critical`}
+                size="small"
+                color="error"
+                variant="filled"
+                sx={{ fontWeight: 700, fontSize: "0.7rem" }}
+              />
+            )}
+            <Chip
+              label={`${totalNotifications} Total`}
+              size="small"
+              color="primary"
+              variant="outlined"
+              sx={{ fontWeight: 600, fontSize: "0.7rem" }}
+            />
+          </Box>
         </Box>
-        {notifications.length > 0 ? (
-          <List sx={{ p: 0 }}>
-            {notifications.map((notification, index) => (
-              <ListItem
-                key={index}
+
+        {/* Legend */}
+        <Box
+          sx={{
+            display: "flex",
+            gap: 2,
+            mb: 2.5,
+            pb: 2,
+            borderBottom: `1px solid ${colors.notificationBorder}`,
+            flexWrap: "wrap",
+          }}
+        >
+          {[
+            { label: "Critical", color: "#ef4444" },
+            { label: "High", color: "#f59e0b" },
+            { label: "Medium", color: "#3b82f6" },
+            { label: "Low", color: "#6b7280" },
+          ].map((item) => (
+            <Box key={item.label} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+              <Box
                 sx={{
-                  py: 1,
-                  px: 0,
-                  borderBottom:
-                    index < notifications.length - 1
-                      ? `1px solid ${colors.notificationBorder}`
-                      : "none",
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  backgroundColor: item.color,
+                  boxShadow: `0 0 5px ${item.color}88`,
                 }}
-              >
-                <ListItemText
-                  primary={`• ${notification.text}`}
-                  primaryTypographyProps={{ fontSize: 14, color: colors.text }}
-                />
-              </ListItem>
-            ))}
-          </List>
+              />
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: "0.7rem" }}>
+                {item.label}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+
+        {/* Category Panels */}
+        {totalNotifications === 0 ? (
+          <Box
+            sx={{
+              py: 5,
+              textAlign: "center",
+              color: colors.textSecondary,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 1,
+            }}
+          >
+            <NotificationsIcon sx={{ fontSize: 40, opacity: 0.3 }} />
+            <Typography variant="body2">No notifications at this time.</Typography>
+          </Box>
         ) : (
-          <Typography sx={{ py: 3, textAlign: "center", color: colors.textSecondary }}>
-            No notifications at this time.
-          </Typography>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            {Object.entries(categorizedNotifications).map(([categoryKey, items]) => (
+              <NotificationCategoryPanel
+                key={categoryKey}
+                category={categoryKey}
+                items={items}
+                darkMode={darkMode}
+              />
+            ))}
+          </Box>
         )}
       </Paper>
 
