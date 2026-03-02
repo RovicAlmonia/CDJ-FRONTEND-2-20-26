@@ -51,7 +51,7 @@ const AuthForm = ({ ...others }) => {
 
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <Typography variant="h4" sx={{ mb: 3, textAlign: 'center' }}>San Fernando Water Level Monitoring</Typography>
+      <Typography variant="h4" sx={{ mb: 3, textAlign: 'center' }}>CDJ Accounting Services</Typography>
       {error ? (
         <Grow in={true}>
           <Chip
