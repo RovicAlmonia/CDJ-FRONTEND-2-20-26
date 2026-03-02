@@ -39,6 +39,9 @@ const ServicesAvailed = Loadable(
 const PaymentLedger = Loadable(
   lazy(() => import("../pages/paymentLedger/index"))
 );
+const RecentlyDeleted = Loadable(
+  lazy(() => import("../pages/deletedlog/index"))
+);
 
 const DashboardRoutes = {
   path: "/",
@@ -75,6 +78,10 @@ const DashboardRoutes = {
     {
       path: "/dashboard/payment-ledger",
       element: <PaymentLedger />,
+    },
+    {
+      path: "/dashboard/recently-deleted",
+      element: <RecentlyDeleted />,
     },
 
     // others

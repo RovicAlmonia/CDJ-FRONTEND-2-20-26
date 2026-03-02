@@ -39,6 +39,8 @@ import { hookContainer } from "../../hooks/globalQuery";
 import { useQueryClient } from "@tanstack/react-query";
 import { http } from "../../api/http";
 import { toast } from "sonner";
+import { useContext } from "react";
+import { AuthContext } from "../../modules/context/AuthContext";
 
 const emptyForm = {
   id: "",
@@ -63,6 +65,9 @@ const emptyForm = {
   status: "Active",
 };
 
+// Add inside component (top, with other hooks):
+
+
 const DATE_FIELD_OPTIONS = [
   { value: "DateRegistered", label: "Date Registered" },
   { value: "DateExpiration", label: "Date Expiration" },
@@ -77,6 +82,7 @@ export default function ClientInt() {
   const darkMode = theme.palette.mode === "dark";
   const queryClient = useQueryClient();
   const { data: clientsRaw } = hookContainer("/selectclientss");
+  const { accessToken } = useContext(AuthContext);
 
   const clientList = Array.isArray(clientsRaw?.data)
     ? clientsRaw.data.map((row, index) => ({ ...row, id: row.ID || index }))
@@ -198,16 +204,18 @@ export default function ClientInt() {
 
   const handleDeleteConfirm = (id) => setDeleteConfirm({ open: true, id });
 
-  const handleDelete = async () => {
-    try {
-      await http.delete(`/deleteclientss?id=${deleteConfirm.id}`);
-      toast.success("Client deleted successfully!");
-      queryClient.invalidateQueries("/selectclientss");
-      setDeleteConfirm({ open: false, id: null });
-    } catch {
-      toast.error("Failed to delete client.");
-    }
-  };
+ const handleDelete = async () => {
+  try {
+    await http.delete(`/deleteclientss?id=${deleteConfirm.id}`, {
+      data: { deletedBy: accessToken?.username || accessToken?.name || accessToken?.EmployeeName || "system" }
+    });
+    toast.success("Client deleted successfully!");
+    queryClient.invalidateQueries("/selectclientss");
+    setDeleteConfirm({ open: false, id: null });
+  } catch {
+    toast.error("Failed to delete client.");
+  }
+};
 
   const paginatedList = filteredList.slice(
     page * rowsPerPage,

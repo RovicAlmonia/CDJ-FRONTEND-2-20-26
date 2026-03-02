@@ -22,6 +22,12 @@ import { hookContainer } from "../../hooks/globalQuery";
 import { useQueryClient } from "@tanstack/react-query";
 import { http } from "../../api/http";
 import { toast } from "sonner";
+// Add to imports:
+import { useContext } from "react";
+import { AuthContext } from "../../modules/context/AuthContext";
+
+// Add inside component:
+
 
 const emptyHdr = {
   id: "", transactiondate: null, clientid: "", particulars: "",
@@ -69,6 +75,7 @@ export default function TransactionInt() {
   const darkMode = theme.palette.mode === "dark";
   const queryClient = useQueryClient();
   const printRef = useRef();
+  const { accessToken } = useContext(AuthContext);
 
   const { data: hdrRaw }      = hookContainer("/selecttransactionhdr");
   const { data: clientsRaw }  = hookContainer("/selectclientss");
@@ -181,14 +188,21 @@ export default function TransactionInt() {
   const handleDeleteConfirm = (id) => setDeleteConfirm({ open: true, id });
 
   const handleDelete = async () => {
-    try {
-      await http.delete(`/deletetransactiondtlbyhdr?hdrid=${deleteConfirm.id}`);
-      await http.delete(`/deletetransactionhdr?id=${deleteConfirm.id}`);
-      toast.success("Transaction deleted.");
-      queryClient.invalidateQueries("/selecttransactionhdr");
-      setDeleteConfirm({ open: false, id: null });
-    } catch { toast.error("Failed to delete."); }
-  };
+  const deletedBy = accessToken?.username || accessToken?.name || accessToken?.EmployeeName || "system";
+  try {
+    await http.delete(`/deletetransactiondtlbyhdr?hdrid=${deleteConfirm.id}`, {
+      data: { deletedBy }
+    });
+    await http.delete(`/deletetransactionhdr?id=${deleteConfirm.id}`, {
+      data: { deletedBy }
+    });
+    toast.success("Transaction deleted.");
+    queryClient.invalidateQueries("/selecttransactionhdr");
+    setDeleteConfirm({ open: false, id: null });
+  } catch {
+    toast.error("Failed to delete.");
+  }
+};
 
   // ── DTL helpers ──
   const dtlChange = (f, v) => {

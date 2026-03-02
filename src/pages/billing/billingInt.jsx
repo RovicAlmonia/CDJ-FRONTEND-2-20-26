@@ -44,6 +44,12 @@ import { hookContainer } from "../../hooks/globalQuery";
 import { useQueryClient } from "@tanstack/react-query";
 import { http } from "../../api/http";
 import { toast } from "sonner";
+// Add to imports:
+import { useContext } from "react";
+import { AuthContext } from "../../modules/context/AuthContext";
+
+// Add inside component:
+
 
 const emptyForm = {
   id: "",
@@ -68,6 +74,7 @@ export default function BillingInt() {
   const theme = useTheme();
   const darkMode = theme.palette.mode === "dark";
   const queryClient = useQueryClient();
+  const { accessToken } = useContext(AuthContext);
 
   const { data: billingRaw } = hookContainer("/selectbillinghdr");
   const { data: hdrRaw } = hookContainer("/selecttransactionhdr");
@@ -347,16 +354,18 @@ export default function BillingInt() {
 
   const handleDeleteConfirm = (id) => setDeleteConfirm({ open: true, id });
 
-  const handleDelete = async () => {
-    try {
-      await http.delete(`/deletebillinghdr?id=${deleteConfirm.id}`);
-      toast.success("Billing record deleted!");
-      queryClient.invalidateQueries("/selectbillinghdr");
-      setDeleteConfirm({ open: false, id: null });
-    } catch {
-      toast.error("Failed to delete.");
-    }
-  };
+const handleDelete = async () => {
+  try {
+    await http.delete(`/deletebillinghdr?id=${deleteConfirm.id}`, {
+      data: { deletedBy: accessToken?.username || accessToken?.name || accessToken?.EmployeeName || "system" }
+    });
+    toast.success("Billing record deleted!");
+    queryClient.invalidateQueries("/selectbillinghdr");
+    setDeleteConfirm({ open: false, id: null });
+  } catch {
+    toast.error("Failed to delete.");
+  }
+};
 
   // ── Print Receipt ──
   const handlePrint = (row) => {

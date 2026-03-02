@@ -39,6 +39,13 @@ import { hookContainer } from "../../hooks/globalQuery";
 import { useQueryClient } from "@tanstack/react-query";
 import { http } from "../../api/http";
 import { toast } from "sonner";
+// Add to imports:
+import { useContext } from "react";
+import { AuthContext } from "../../modules/context/AuthContext";
+
+// Add inside component:
+
+
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -98,6 +105,7 @@ export default function ServicesListInt() {
   const darkMode = theme.palette.mode === "dark";
   const queryClient = useQueryClient();
   const { data: servicesRaw } = hookContainer("/selectserviceslist");
+  const { accessToken } = useContext(AuthContext);
 
   const servicesList = Array.isArray(servicesRaw?.data)
     ? servicesRaw.data.map((row, index) => ({ ...row, id: row.ID || index }))
@@ -209,15 +217,17 @@ export default function ServicesListInt() {
   const handleDeleteConfirm = (id) => setDeleteConfirm({ open: true, id });
 
   const handleDelete = async () => {
-    try {
-      await http.delete(`/deleteserviceslist?id=${deleteConfirm.id}`);
-      toast.success("Service record deleted.");
-      queryClient.invalidateQueries("/selectserviceslist");
-      setDeleteConfirm({ open: false, id: null });
-    } catch {
-      toast.error("Failed to delete service.");
-    }
-  };
+  try {
+    await http.delete(`/deleteserviceslist?id=${deleteConfirm.id}`, {
+      data: { deletedBy: accessToken?.username || accessToken?.name || accessToken?.EmployeeName || "system" }
+    });
+    toast.success("Service record deleted.");
+    queryClient.invalidateQueries("/selectserviceslist");
+    setDeleteConfirm({ open: false, id: null });
+  } catch {
+    toast.error("Failed to delete service.");
+  }
+};
 
   // ── Styles ──────────────────────────────────────────────────
   const cellSx = {
