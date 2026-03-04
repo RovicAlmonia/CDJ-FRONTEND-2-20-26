@@ -41,7 +41,6 @@ import BadgeIcon from "@mui/icons-material/Badge";
 import MiscellaneousServicesIcon from "@mui/icons-material/MiscellaneousServices";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { hookContainer } from "../../hooks/globalQuery";
@@ -54,12 +53,12 @@ dayjs.extend(relativeTime);
 
 // ── Module config ─────────────────────────────────────────────
 const MODULES = [
-  { key: "All",         label: "All",         icon: <HistoryIcon />,                   color: "default"  },
-  { key: "Client",      label: "Clients",      icon: <PeopleIcon />,                    color: "primary"  },
-  { key: "Employee",    label: "Employees",    icon: <BadgeIcon />,                     color: "secondary"},
-  { key: "Service",     label: "Services",     icon: <MiscellaneousServicesIcon />,     color: "info"     },
-  { key: "Transaction", label: "Transactions", icon: <ReceiptLongIcon />,               color: "warning"  },
-  { key: "Payroll",     label: "Payroll",      icon: <AccountBalanceWalletIcon />,      color: "success"  },
+  { key: "All",         label: "All",         icon: <HistoryIcon />,               color: "default"   },
+  { key: "Client",      label: "Clients",      icon: <PeopleIcon />,                color: "primary"   },
+  { key: "Employee",    label: "Employees",    icon: <BadgeIcon />,                 color: "secondary" },
+  { key: "Service",     label: "Services",     icon: <MiscellaneousServicesIcon />, color: "info"      },
+  { key: "Transaction", label: "Transactions", icon: <ReceiptLongIcon />,           color: "warning"   },
+  { key: "Payroll",     label: "Payroll",      icon: <AccountBalanceWalletIcon />,  color: "success"   },
 ];
 
 const MODULE_COLORS = {
@@ -70,29 +69,21 @@ const MODULE_COLORS = {
   Payroll:     "success",
 };
 
-// Days remaining chip
-function ExpiryChip({ daysLeft }) {
-  const d = parseInt(daysLeft);
-  if (d <= 3)  return <Chip label={`${d}d left`} size="small" color="error"   variant="filled"  sx={{ fontSize: "0.68rem", height: 18 }} />;
-  if (d <= 10) return <Chip label={`${d}d left`} size="small" color="warning" variant="filled"  sx={{ fontSize: "0.68rem", height: 18 }} />;
-  return            <Chip label={`${d}d left`} size="small" color="default" variant="outlined" sx={{ fontSize: "0.68rem", height: 18 }} />;
-}
-
 export default function RecentlyDeleted() {
   const theme = useTheme();
   const darkMode = theme.palette.mode === "dark";
   const queryClient = useQueryClient();
   const { accessToken } = useContext(AuthContext);
 
-  const currentUser = accessToken?.username || accessToken?.name || "admin";
+  const currentUser = accessToken?.username || accessToken?.name || accessToken?.EmployeeName || "system";
 
   // ── State ─────────────────────────────────────────────────
-  const [moduleFilter, setModuleFilter] = useState("All");
-  const [searchQuery, setSearchQuery]   = useState("");
-  const [page, setPage]                 = useState(0);
-  const [rowsPerPage, setRowsPerPage]   = useState(10);
-  const [detailDialog, setDetailDialog] = useState({ open: false, record: null });
-  const [restoreDialog, setRestoreDialog] = useState({ open: false, record: null });
+  const [moduleFilter, setModuleFilter]         = useState("All");
+  const [searchQuery, setSearchQuery]           = useState("");
+  const [page, setPage]                         = useState(0);
+  const [rowsPerPage, setRowsPerPage]           = useState(10);
+  const [detailDialog, setDetailDialog]         = useState({ open: false, record: null });
+  const [restoreDialog, setRestoreDialog]       = useState({ open: false, record: null });
   const [permDeleteDialog, setPermDeleteDialog] = useState({ open: false, record: null });
 
   // ── Data ──────────────────────────────────────────────────
@@ -172,7 +163,7 @@ export default function RecentlyDeleted() {
     whiteSpace: "nowrap",
   };
 
-  const headerCells = ["#", "Module", "Record", "Deleted By", "Deleted At", "Expires In", "Actions"];
+  const headerCells = ["#", "Module", "Record", "Deleted By", "Deleted At", "Actions"];
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -197,14 +188,14 @@ export default function RecentlyDeleted() {
           <Box>
             <Typography variant="h6" fontWeight="bold">Recently Deleted</Typography>
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              Records are permanently removed after 60 days. Restore before they expire.
+              Deleted records are kept here until permanently removed.
             </Typography>
           </Box>
         </Box>
         <Chip
-          icon={<WarningAmberIcon />}
-          label={`${totalDeleted} record${totalDeleted !== 1 ? "s" : ""} pending deletion`}
-          color={totalDeleted > 0 ? "warning" : "default"}
+          icon={<HistoryIcon />}
+          label={`${totalDeleted} deleted record${totalDeleted !== 1 ? "s" : ""}`}
+          color="default"
           variant="outlined"
         />
       </Paper>
@@ -350,102 +341,89 @@ export default function RecentlyDeleted() {
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedList.map((row, index) => {
-                  const daysLeft = parseInt(row.DaysUntilExpiry || 0);
-                  const isUrgent = daysLeft <= 3;
-                  return (
-                    <TableRow
-                      key={row.ID}
-                      hover
-                      sx={{
-                        backgroundColor: isUrgent
-                          ? alpha(theme.palette.error.main, darkMode ? 0.07 : 0.03)
-                          : index % 2 === 0
-                          ? "transparent"
-                          : "action.hover",
-                        "&:hover": { backgroundColor: "action.selected" },
-                      }}
-                    >
-                      {/* # */}
-                      <TableCell sx={{ ...cellSx, color: "text.disabled", fontSize: "0.72rem", width: 50, textAlign: "center" }}>
-                        {page * rowsPerPage + index + 1}
-                      </TableCell>
+                paginatedList.map((row, index) => (
+                  <TableRow
+                    key={row.ID}
+                    hover
+                    sx={{
+                      backgroundColor: index % 2 === 0 ? "transparent" : "action.hover",
+                      "&:hover": { backgroundColor: "action.selected" },
+                    }}
+                  >
+                    {/* # */}
+                    <TableCell sx={{ ...cellSx, color: "text.disabled", fontSize: "0.72rem", width: 50, textAlign: "center" }}>
+                      {page * rowsPerPage + index + 1}
+                    </TableCell>
 
-                      {/* Module */}
-                      <TableCell sx={cellSx}>
-                        <Chip
-                          label={row.Module}
-                          size="small"
-                          color={MODULE_COLORS[row.Module] || "default"}
-                          variant="outlined"
-                          sx={{ fontSize: "0.7rem", height: 20 }}
-                        />
-                      </TableCell>
+                    {/* Module */}
+                    <TableCell sx={cellSx}>
+                      <Chip
+                        label={row.Module}
+                        size="small"
+                        color={MODULE_COLORS[row.Module] || "default"}
+                        variant="outlined"
+                        sx={{ fontSize: "0.7rem", height: 20 }}
+                      />
+                    </TableCell>
 
-                      {/* Record */}
-                      <TableCell sx={{ ...cellSx, maxWidth: 260, whiteSpace: "normal" }}>
-                        <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.3 }}>
-                          {row.RecordLabel}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: "text.disabled" }}>
-                          ID: {row.RecordID}
-                        </Typography>
-                      </TableCell>
+                    {/* Record */}
+                    <TableCell sx={{ ...cellSx, maxWidth: 260, whiteSpace: "normal" }}>
+                      <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.3 }}>
+                        {row.RecordLabel}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.disabled" }}>
+                        ID: {row.RecordID}
+                      </Typography>
+                    </TableCell>
 
-                      {/* Deleted By */}
-                      <TableCell sx={cellSx}>
-                        <Typography variant="body2">{row.DeletedBy}</Typography>
-                      </TableCell>
+                    {/* Deleted By */}
+                    <TableCell sx={cellSx}>
+                      <Typography variant="body2">{row.DeletedBy}</Typography>
+                    </TableCell>
 
-                      {/* Deleted At */}
-                      <TableCell sx={cellSx}>
-                        <Typography variant="body2">
-                          {dayjs(row.DeletedAt).format("MMM D, YYYY")}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: "text.disabled" }}>
-                          {dayjs(row.DeletedAt).fromNow()}
-                        </Typography>
-                      </TableCell>
+                    {/* Deleted At */}
+                    <TableCell sx={cellSx}>
+                      <Typography variant="body2">
+                        {dayjs(row.DeletedAt).format("MMM D, YYYY")}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.disabled" }}>
+                        {dayjs(row.DeletedAt).fromNow()}
+                      </Typography>
+                    </TableCell>
 
-                      {/* Expires In */}
-                      <TableCell sx={cellSx}>
-                        <ExpiryChip daysLeft={daysLeft} />
-                      </TableCell>
-
-                      {/* Actions */}
-                      <TableCell sx={cellSx} align="center">
-                        <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
-                          <Tooltip title="View Details">
-                            <IconButton
-                              size="small"
-                              onClick={() => setDetailDialog({ open: true, record: row })}
-                            >
-                              <InfoOutlinedIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Restore">
-                            <IconButton
-                              size="small"
-                              color="success"
-                              onClick={() => setRestoreDialog({ open: true, record: row })}
-                            >
-                              <RestoreIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete Permanently">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => setPermDeleteDialog({ open: true, record: row })}
-                            >
-                              <DeleteForeverIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                    {/* Actions */}
+                    <TableCell sx={cellSx} align="center">
+                      <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
+                        <Tooltip title="View Details">
+                          <IconButton
+                            size="small"
+                            onClick={() => setDetailDialog({ open: true, record: row })}
+                          >
+                            <InfoOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Restore">
+                          <IconButton
+                            size="small"
+                            color="success"
+                            onClick={() => setRestoreDialog({ open: true, record: row })}
+                          >
+                            <RestoreIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Permanently">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => setPermDeleteDialog({ open: true, record: row })}
+                          >
+                            <DeleteForeverIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
@@ -497,7 +475,6 @@ export default function RecentlyDeleted() {
                     { label: "Record Name", value: r.RecordLabel },
                     { label: "Deleted By",  value: r.DeletedBy },
                     { label: "Deleted At",  value: dayjs(r.DeletedAt).format("MMMM D, YYYY h:mm A") },
-                    { label: "Expires At",  value: `${dayjs(r.ExpiresAt).format("MMMM D, YYYY")} (${r.DaysUntilExpiry} days left)` },
                   ].map(({ label, value }) => (
                     <Grid item xs={12} sm={6} key={label}>
                       <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>{label}</Typography>
@@ -582,7 +559,15 @@ export default function RecentlyDeleted() {
               <Typography variant="body2">
                 Are you sure you want to restore this record?
               </Typography>
-              <Paper elevation={0} sx={{ p: 1.5, borderRadius: 1, border: "1px solid", borderColor: "success.main", backgroundColor: alpha(theme.palette.success.main, 0.05), mt: 1 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.5, borderRadius: 1, border: "1px solid",
+                  borderColor: "success.main",
+                  backgroundColor: alpha(theme.palette.success.main, 0.05),
+                  mt: 1,
+                }}
+              >
                 <Typography variant="body2" fontWeight={700}>{restoreDialog.record.RecordLabel}</Typography>
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   {restoreDialog.record.Module} · Deleted by {restoreDialog.record.DeletedBy} on {dayjs(restoreDialog.record.DeletedAt).format("MMM D, YYYY")}
@@ -620,7 +605,15 @@ export default function RecentlyDeleted() {
               <Typography variant="body2">
                 This will <strong>permanently remove</strong> this record from the deleted log. This action cannot be undone.
               </Typography>
-              <Paper elevation={0} sx={{ p: 1.5, borderRadius: 1, border: "1px solid", borderColor: "error.main", backgroundColor: alpha(theme.palette.error.main, 0.05), mt: 1 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.5, borderRadius: 1, border: "1px solid",
+                  borderColor: "error.main",
+                  backgroundColor: alpha(theme.palette.error.main, 0.05),
+                  mt: 1,
+                }}
+              >
                 <Typography variant="body2" fontWeight={700}>{permDeleteDialog.record.RecordLabel}</Typography>
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   {permDeleteDialog.record.Module} · Deleted {dayjs(permDeleteDialog.record.DeletedAt).fromNow()}

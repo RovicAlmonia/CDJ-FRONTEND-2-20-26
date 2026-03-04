@@ -357,7 +357,7 @@ export default function BillingInt() {
 const handleDelete = async () => {
   try {
     await http.delete(`/deletebillinghdr?id=${deleteConfirm.id}`, {
-      data: { deletedBy: accessToken?.username || accessToken?.name || accessToken?.EmployeeName || "system" }
+      data: { deletedBy: accessToken?.userName || accessToken?.Fname || "system" }
     });
     toast.success("Billing record deleted!");
     queryClient.invalidateQueries("/selectbillinghdr");
