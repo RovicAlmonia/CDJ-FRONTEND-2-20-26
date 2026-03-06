@@ -44,12 +44,8 @@ import { hookContainer } from "../../hooks/globalQuery";
 import { useQueryClient } from "@tanstack/react-query";
 import { http } from "../../api/http";
 import { toast } from "sonner";
-// Add to imports:
 import { useContext } from "react";
 import { AuthContext } from "../../modules/context/AuthContext";
-
-// Add inside component:
-
 
 const emptyForm = {
   id: "",
@@ -62,7 +58,6 @@ const emptyForm = {
   paymentmethod: "",
   paymentreference: "",
   paymentstatus: "Unpaid",
-  // For display only — not sent to server
   _carryForwardBalance: 0,
   _newMonthGross: 0,
 };
@@ -95,7 +90,6 @@ export default function BillingInt() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedRow, setExpandedRow] = useState(null);
 
-  // Enrich billing rows with client info + transaction breakdown
   const enrichedList = billingList.map((b) => {
     const client = clientList.find(
       (c) => String(c.ClientID) === String(b.ClientID)
@@ -133,49 +127,26 @@ export default function BillingInt() {
   const grandNet      = enrichedList.reduce((s, r) => s + parseFloat(r.Net           || 0), 0);
   const grandPaid     = enrichedList.reduce((s, r) => s + parseFloat(r.PaymentAmount || 0), 0);
 
-  /**
-   * Compute the unpaid carry-forward balance for a given client.
-   *
-   * Logic:
-   *   For every existing billing record of this client, calculate:
-   *     balance = Net - PaymentAmount
-   *   Sum all positive balances (outstanding amounts).
-   *
-   * This means:
-   *   - If they owe ₱33,000 from last month and this month's transactions
-   *     add ₱66,000 more, the new Net = ₱33,000 + ₱66,000 = ₱99,000.
-   *   - The existing billing record (last month's) stays as-is; only the
-   *     NEW record carries the rolled-over balance forward.
-   */
   const getCarryForwardBalance = (clientId, excludeBillingId = null) => {
     const clientBillings = billingList.filter(
       (b) =>
         String(b.ClientID) === String(clientId) &&
         (excludeBillingId === null || String(b.ID) !== String(excludeBillingId))
     );
-
     if (clientBillings.length === 0) return 0;
-
-    // Sort by ID descending — most recent record first
     const sorted = [...clientBillings].sort((a, b) => Number(b.ID) - Number(a.ID));
     const latest = sorted[0];
-
-    // If the latest billing is fully Paid, slate is clean — no carry forward
     if (latest.PaymentStatus === "Paid") return 0;
-
-    // Otherwise carry forward only the remaining balance of the latest record
     const net  = parseFloat(latest.Net           || 0);
     const paid = parseFloat(latest.PaymentAmount || 0);
     return Math.max(0, net - paid);
   };
 
-  // ── handleChange: auto-fill gross/discount/net + carry-forward balance ──
   const handleChange = (field, value) => {
     setForm((prev) => {
       const updated = { ...prev, [field]: value };
 
       if (field === "clientid") {
-        // Check if the latest billing record for this client is fully Paid
         const clientBillings = billingList.filter(
           (b) => String(b.ClientID) === String(value)
         );
@@ -183,13 +154,10 @@ export default function BillingInt() {
         const latestBilling = sorted[0];
         const isLatestPaid  = latestBilling?.PaymentStatus === "Paid";
 
-        // Determine client retention type
         const clientInfo    = clientList.find((c) => String(c.ClientID) === String(value));
         const retentionType = (clientInfo?.RetentionType || "").toLowerCase();
         const isMonthly     = retentionType === "monthly";
 
-        // For Monthly retention: only include transactions from the CURRENT month.
-        // For other types: include all transactions (existing behavior).
         const now           = dayjs();
         const allClientTxns = transactionList.filter(
           (t) => String(t.ClientID) === String(value)
@@ -216,27 +184,21 @@ export default function BillingInt() {
         updated._isLatestPaid          = isLatestPaid;
         updated._isMonthly             = isMonthly;
         updated._currentMonthTxnCount  = isMonthly ? clientTxns.length : allClientTxns.length;
-
-        // Reset payment fields when client changes
         updated.paymentamount    = "";
         updated.paymentstatus    = "Unpaid";
         updated.paymentdate      = null;
         updated.paymentmethod    = "";
         updated.paymentreference = "";
-
         return updated;
       }
 
-      // Recalculate net when gross or discount changes (manual override)
       const gross    = parseFloat(field === "gross"    ? value : updated.gross)    || 0;
       const discount = parseFloat(field === "discount" ? value : updated.discount) || 0;
       const payment  = parseFloat(field === "paymentamount" ? value : updated.paymentamount) || 0;
       const carry    = updated._carryForwardBalance || 0;
 
-      // Net = (gross - discount) + carry-forward
       updated.net = (gross - discount + carry).toFixed(2);
 
-      // Auto-set payment status
       if (field === "paymentamount" || field === "gross" || field === "discount") {
         const net = gross - discount + carry;
         if (payment <= 0)        updated.paymentstatus = "Unpaid";
@@ -255,7 +217,6 @@ export default function BillingInt() {
   };
 
   const handleEdit = (row) => {
-    // When editing, the carry-forward is all OTHER billing records for this client
     const carryForward = getCarryForwardBalance(row.ClientID, row.ID);
     setForm({
       id: row.ID,
@@ -282,12 +243,14 @@ export default function BillingInt() {
 
   const fmt = (val) => (val ? dayjs(val).format("YYYY-MM-DD") : null);
 
-  // ── Map billing payment status → transaction status ──
   const resolveTransactionStatus = (paymentstatus) => {
     if (paymentstatus === "Paid")    return "Paid";
     if (paymentstatus === "Partial") return "Posted";
     return "Active";
   };
+
+  // ── FIX: resolve logged-in username from JWT payload ──────────
+  const currentUser = accessToken?.userName || accessToken?.Fname || "system";
 
   const handleSubmit = async () => {
     if (!form.clientid) {
@@ -295,7 +258,6 @@ export default function BillingInt() {
       return;
     }
     const payload = {
-      // Strip internal-only fields before sending to server
       id: form.id,
       clientid: form.clientid,
       gross: parseFloat(form.gross) || 0,
@@ -309,14 +271,9 @@ export default function BillingInt() {
     };
     try {
       if (isEdit) {
-        // ── EDIT: update ONLY this billing record — never touch transactions ──
-        // Editing payment details (amount, method, status) on one billing record
-        // must NOT affect other billing records or their linked transactions.
         await http.post("/updatebillinghdr", payload);
         toast.success("Billing record updated.");
-
       } else {
-        // ── ADD: save new billing + cascade status to all active client transactions ──
         await http.post("/postbillinghdr", payload);
 
         const txnStatus  = resolveTransactionStatus(form.paymentstatus);
@@ -327,17 +284,22 @@ export default function BillingInt() {
         await Promise.all(
           clientTxns.map((txn) =>
             http.post("/updatetransactionhdr", {
-              id: txn.ID,
+              id:              txn.ID,
               transactiondate: txn.TransactionDate,
-              clientid: txn.ClientID,
-              particulars: txn.Particulars,
-              grosstotal: txn.GrossTotal,
-              discount: txn.Discount,
-              nettotal: txn.NetTotal,
-              status: txnStatus,
+              clientid:        txn.ClientID,
+              particulars:     txn.Particulars,
+              grosstotal:      txn.GrossTotal,
+              discount:        txn.Discount,
+              nettotal:        txn.NetTotal,
+              status:          txnStatus,
+              preparedby:      txn.PreparedBy || currentUser, // ← preserve existing or use current user
             })
           )
         );
+
+        // ── Also backfill PreparedBy on tbltransactionhdr rows that are NULL ──
+        // This runs posttransactionhdr is not involved here, but updatetransactionhdr
+        // now carries preparedby so future saves will populate it correctly.
 
         toast.success(
           `Billing saved. ${clientTxns.length} transaction(s) marked as "${txnStatus}".`
@@ -354,20 +316,19 @@ export default function BillingInt() {
 
   const handleDeleteConfirm = (id) => setDeleteConfirm({ open: true, id });
 
-const handleDelete = async () => {
-  try {
-    await http.delete(`/deletebillinghdr?id=${deleteConfirm.id}`, {
-      data: { deletedBy: accessToken?.userName || accessToken?.Fname || "system" }
-    });
-    toast.success("Billing record deleted!");
-    queryClient.invalidateQueries("/selectbillinghdr");
-    setDeleteConfirm({ open: false, id: null });
-  } catch {
-    toast.error("Failed to delete.");
-  }
-};
+  const handleDelete = async () => {
+    try {
+      await http.delete(`/deletebillinghdr?id=${deleteConfirm.id}`, {
+        data: { deletedBy: currentUser }
+      });
+      toast.success("Billing record deleted!");
+      queryClient.invalidateQueries("/selectbillinghdr");
+      setDeleteConfirm({ open: false, id: null });
+    } catch {
+      toast.error("Failed to delete.");
+    }
+  };
 
-  // ── Print Receipt ──
   const handlePrint = (row) => {
     const fmtM = (val) =>
       parseFloat(val || 0).toLocaleString("en-PH", {
@@ -536,7 +497,6 @@ const handleDelete = async () => {
     "& .MuiOutlinedInput-root": { backgroundColor: "action.hover" },
   };
 
-  // Carry-forward info for display in the form
   const carryForward = form._carryForwardBalance || 0;
   const newMonthNet  = parseFloat(form.net || 0) - carryForward;
 
@@ -730,7 +690,6 @@ const handleDelete = async () => {
                                 : <KeyboardArrowDownIcon fontSize="small" />}
                             </IconButton>
                           </TableCell>
-
                           <TableCell sx={{ ...cellSx, color: "text.disabled", fontSize: "0.72rem", textAlign: "center" }}>
                             {rowNumber}
                           </TableCell>
@@ -881,7 +840,6 @@ const handleDelete = async () => {
                                   </TableBody>
                                 </Table>
 
-                                {/* Payment summary in expanded view */}
                                 <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.5 }}>
                                   <Paper elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, p: 1.5, minWidth: 220 }}>
                                     <Typography variant="caption" fontWeight="bold" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -984,14 +942,12 @@ const handleDelete = async () => {
 
           <DialogContent dividers sx={{ p: 3 }}>
             <Grid container spacing={2}>
-
               <Grid item xs={12}>
                 <Typography variant="subtitle2" fontWeight="bold" sx={{ color: "text.secondary" }}>
                   Billing Details
                 </Typography>
               </Grid>
 
-              {/* Client selector */}
               <Grid item xs={12}>
                 <TextField
                   label="Client ID"
@@ -1010,7 +966,6 @@ const handleDelete = async () => {
                 </TextField>
               </Grid>
 
-              {/* Carry-forward balance info banner — only shown when there's a prior balance */}
               {!isEdit && carryForward > 0 && form.clientid && (
                 <Grid item xs={12}>
                   <Paper
@@ -1049,7 +1004,6 @@ const handleDelete = async () => {
                 </Grid>
               )}
 
-              {/* Gross — read-only */}
               <Grid item xs={12} sm={6}>
                 <TextField
                   label="Gross (₱)"
@@ -1067,7 +1021,6 @@ const handleDelete = async () => {
                 />
               </Grid>
 
-              {/* Discount — read-only */}
               <Grid item xs={12} sm={6}>
                 <TextField
                   label="Discount (₱)"
@@ -1085,7 +1038,6 @@ const handleDelete = async () => {
                 />
               </Grid>
 
-              {/* Net — read-only, includes carry-forward */}
               <Grid item xs={12} sm={6}>
                 <TextField
                   label="Net (₱)"

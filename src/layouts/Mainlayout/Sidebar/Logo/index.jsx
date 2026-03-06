@@ -1,5 +1,5 @@
 import { Box, Stack, Typography, useTheme } from "@mui/material"
-import sanfern from '../../../../assets/company-logo/sdj.png'
+import sanfern from '../../../../assets/company-logo/CDJ_FINAL.png'
 import { tokens } from "../../../../themes/palette";
 
 const SidebarLogo = () => {

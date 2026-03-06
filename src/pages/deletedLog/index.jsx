@@ -1,4 +1,4 @@
-import RecentlyDeletedInt from "./recentlyDeleted";
+import RecentlyDeletedInt from "./recentlyDeleted.jsx";
 
 export default function RecentlyDeletedPage() {
   return <RecentlyDeletedInt />;

@@ -1,5 +1,5 @@
 import { Box, Stack, useTheme } from "@mui/material"
-import sanfern from '../../../../assets/company-logo/sdj.png'
+import sanfern from '../../../../assets/company-logo/CDJJJ.png'
 
 const TopNavLogo = () => {
   const theme = useTheme();

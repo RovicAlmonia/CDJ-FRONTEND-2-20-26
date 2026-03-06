@@ -26,12 +26,7 @@ const navigateSOA = () => {       {/* ← ADD */}
           MenuClick={navigateDashboard}
           IconChildrens={<DashboardIcon fontSize="small" />}
         />
-        <ListItemButtonStyle
-          ListbtnLabel="SOA Billing"
-          activePath="/dashboard/billing"
-          MenuClick={navigateSOA}
-          IconChildrens={<DashboardIcon fontSize="small" />}
-        />
+        
         <Administrative />
         
       </CustomList>

@@ -1,14 +1,5 @@
-import { Skeleton, ListItemAvatar } from "@mui/material"
-const SkeletonAvatar = () => {
-  return (
-    <ListItemAvatar sx={{
-        flexShrink: 0,
-        minWidth: 0,
-        marginRight: '16px'
-    }}>
-        <Skeleton variant="circular" width={40} height={40} />
-    </ListItemAvatar>
-  )
-}
+import Skeleton from "@mui/material/Skeleton";
 
-export default SkeletonAvatar
+export default function SkeletonAvatar() {
+  return <Skeleton variant="circular" width={40} height={40} />;
+}

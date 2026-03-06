@@ -134,9 +134,9 @@ export default function Administrative() {
               onClick={navigateServicesList}
             />
             <CustomMenuButton
-              label="Payment Ledger"
-              activePath="/dashboard/payment-ledger"
-              onClick={navigatePaymentLedger}
+              label="Clients"
+              activePath="/dashboard/clients"
+              onClick={navigateClients}
             />
           </>
         }
@@ -150,69 +150,54 @@ export default function Administrative() {
           onClick={navigateServicesList}
         />
         <ListBtn
-          label="Payment Ledger"
-          activePath="/dashboard/payment-ledger"
-          onClick={navigatePaymentLedger}
+          label="Clients"
+          activePath="/dashboard/clients"
+          onClick={navigateClients}
         />
       </Collapsebtn>
-
-      {/* ══════════════════════ CLIENT ══════════════════════════ */}
+ {/* ══════════════════════ MASTERFILE ══════════════════════ */}
       <StyledCollapsedButton
         id={id}
-        onClick={toggleClient}
-        IconChildren={<PeopleAltIcon fontSize="small" />}
-        CollpaseBtnLabels={
-          <span
-            onClick={(e) => { e.stopPropagation(); navigateClients(); }}
-            style={{ cursor: "pointer" }}
-          >
-            Client
-          </span>
-        }
-        handlePopoverOpen={isVertical ? blackFunc : handleOpenClientCollapse}
-        handlePopoverClose={handleCloseClientCollapse}
+        onClick={toggleMasterfile}
+        IconChildren={<LayersIcon fontSize="small" />}
+        CollpaseBtnLabels="Transactions"
+        handlePopoverOpen={isVertical ? blackFunc : handleOpenMasterfileCollapse}
+        handlePopoverClose={handleCloseMasterfileCollapse}
         {...btnColors}
       >
-        <CollapseArrow isOpen={openClient} />
+        <CollapseArrow isOpen={openMasterfile} />
       </StyledCollapsedButton>
 
       {/* Collapsed / horizontal popover */}
       <StyledPopover
         id={id}
-        open={openClientBool}
-        anchorEl={anchorClient}
-        onMouseLeave={handleCloseClientCollapse}
-        onMouseEnter={toggleClient}
-        popoverRef={popoverClientRef}
+        open={openMasterfileBool}
+        anchorEl={anchorMasterfile}
+        onMouseLeave={handleCloseMasterfileCollapse}
+        onMouseEnter={toggleMasterfile}
+        popoverRef={popoverMasterfileRef}
         menuButton={
           <>
             <CustomMenuButton
-              label="Services Availed"
-              activePath="/dashboard/services-availed"
-              onClick={navigateServicesAvailed}
-            />
-            <CustomMenuButton
-              label="Create Transaction & Logs"
+              label="Create Billing"
               activePath="/dashboard/transactions"
               onClick={navigateTransactions}
             />
+            
           </>
         }
       />
 
       {/* Vertical expanded collapse */}
-      <Collapsebtn stateOpen={openClient}>
+      <Collapsebtn stateOpen={openMasterfile}>
         <ListBtn
-          label="Services Availed"
-          activePath="/dashboard/services-availed"
-          onClick={navigateServicesAvailed}
-        />
-        <ListBtn
-          label="Create Transaction & Logs"
+          label="Create Billing"
           activePath="/dashboard/transactions"
           onClick={navigateTransactions}
         />
+        
       </Collapsebtn>
+
     </>
   );
 }

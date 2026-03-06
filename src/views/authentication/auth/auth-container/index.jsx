@@ -2,14 +2,17 @@ import { Box, Grid, useMediaQuery, useTheme, Typography } from "@mui/material";
 import AuthForm from "../auth-form";
 import { Fragment } from "react";
 import { Helmet } from "react-helmet-async";
-import OverlayImage from '../../../../assets/company-logo/1.png';
-import OverlayImageTwo from '../../../../assets/company-logo/1.png';
+import LightImage from '../../../../assets/company-logo/lightmode.png';
+import DarkImage from '../../../../assets/company-logo/darkmode.png';
 
 export default function SignInSide() {
   const theme = useTheme();
   const isMobile = useMediaQuery('(max-width:900px)');
   const isSmallScreen = useMediaQuery('(max-width:900px)');
   const isDark = theme.palette.appSettings.paletteMode === 'dark';
+
+  // ── Switch image based on theme ──
+  const OverlayImage = isDark ? DarkImage : LightImage;
 
   const primaryRed = '#C0392B';
   const darkRed = '#922B21';
@@ -51,54 +54,43 @@ export default function SignInSide() {
             position: 'absolute', top: '-10%', right: '-5%',
             width: '45%', height: '45%', borderRadius: '50%',
             background: `radial-gradient(circle, ${primaryRed}28 0%, transparent 70%)`,
-            pointerEvents: 'none',
+            pointerEvents: 'none', zIndex: 1,
           }} />
           <Box sx={{
             position: 'absolute', bottom: '-8%', left: '-5%',
             width: '40%', height: '40%', borderRadius: '50%',
             background: `radial-gradient(circle, ${primaryRed}20 0%, transparent 70%)`,
-            pointerEvents: 'none',
+            pointerEvents: 'none', zIndex: 1,
           }} />
           <Box sx={{
             position: 'absolute', top: '40%', left: '10%',
             width: '20%', height: '20%', borderRadius: '50%',
             background: `radial-gradient(circle, #4A90E244 0%, transparent 70%)`,
-            pointerEvents: 'none',
+            pointerEvents: 'none', zIndex: 1,
           }} />
 
-          {/* Main illustration */}
+          {/* ── Main illustration — switches between light/dark ── */}
           <Box
             component="img"
             src={OverlayImage}
             alt="CDJ Bookkeeping Illustration"
             sx={{
-              width: isSmallScreen ? '80%' : '78%',
-              maxWidth: 620,
-              height: 'auto',
-              position: 'relative',
-              zIndex: 1,
-              filter: isDark
-                ? 'drop-shadow(0 24px 48px rgba(192,57,43,0.35))'
-                : 'drop-shadow(0 24px 48px rgba(0,0,0,0.18))',
+              width: '100%',
+              maxWidth: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              zIndex: 0,
             }}
           />
-
-          {/* Tagline */}
-          <Box sx={{ mt: 3, px: 8, textAlign: 'center', position: 'relative', zIndex: 1 }}>
-            <Typography sx={{
-              fontSize: 13,
-              color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)',
-              fontStyle: 'italic',
-              letterSpacing: '0.06em',
-            }}>
-              Trusted bookkeeping solutions for your business
-            </Typography>
-          </Box>
 
           {/* Bottom accent bar */}
           <Box sx={{
             position: 'absolute', bottom: 0, left: 0, right: 0, height: 4,
             background: `linear-gradient(90deg, transparent 0%, ${primaryRed} 40%, ${darkRed} 60%, transparent 100%)`,
+            zIndex: 2,
           }} />
         </Grid>
 
@@ -114,11 +106,11 @@ export default function SignInSide() {
             padding: 2,
             background: {
               xs: isDark
-                ? `linear-gradient(rgba(22, 28, 36, 0.74), rgba(22, 28, 36, 0.74)) center center / cover no-repeat, url(${OverlayImageTwo})`
-                : `linear-gradient(rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.74)) center center / cover no-repeat, url(${OverlayImageTwo})`,
+                ? `linear-gradient(rgba(22, 28, 36, 0.74), rgba(22, 28, 36, 0.74)) center center / cover no-repeat, url(${OverlayImage})`
+                : `linear-gradient(rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.74)) center center / cover no-repeat, url(${OverlayImage})`,
               sm: isDark
-                ? `linear-gradient(rgba(22, 28, 36, 0.74), rgba(22, 28, 36, 0.74)) center center / cover no-repeat, url(${OverlayImageTwo})`
-                : `linear-gradient(rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.74)) center center / cover no-repeat, url(${OverlayImageTwo})`,
+                ? `linear-gradient(rgba(22, 28, 36, 0.74), rgba(22, 28, 36, 0.74)) center center / cover no-repeat, url(${OverlayImage})`
+                : `linear-gradient(rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.74)) center center / cover no-repeat, url(${OverlayImage})`,
               md: 'inherit',
               lg: 'inherit',
             },
