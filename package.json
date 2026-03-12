@@ -57,6 +57,7 @@
     "react-router-dom": "^6.30.0",
     "react-slick": "^0.30.3",
     "react-time-ago": "^7.3.3",
+    "recharts": "^3.8.0",
     "redux": "^5.0.1",
     "slick-carousel": "^1.8.1",
     "socket.io-client": "^4.8.1",
@@ -64,6 +65,7 @@
     "tall": "^8.0.0",
     "tesseract.js": "^5.1.1",
     "use-sound": "^4.0.4",
+    "xlsx": "^0.18.5",
     "yup": "^1.6.1"
   },
   "devDependencies": {

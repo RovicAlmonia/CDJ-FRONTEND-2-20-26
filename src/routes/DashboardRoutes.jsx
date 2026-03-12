@@ -42,6 +42,12 @@ const PaymentLedger = Loadable(
 const RecentlyDeleted = Loadable(
   lazy(() => import("../pages/deletedlog/index"))
 );
+const RevenueReport = Loadable(
+  lazy(() => import("../pages/Pages/index"))
+);
+const FilingTracker = Loadable(
+  lazy(() => import("../pages/filingTracker/filingTracker"))
+);
 
 const DashboardRoutes = {
   path: "/",
@@ -82,6 +88,14 @@ const DashboardRoutes = {
     {
       path: "/dashboard/recently-deleted",
       element: <RecentlyDeleted />,
+    },
+    {
+      path: "/dashboard/revenue-report",
+      element: <RevenueReport />,
+    },
+    {
+      path: "/dashboard/filing-tracker",
+      element: <FilingTracker />,
     },
 
     // others
