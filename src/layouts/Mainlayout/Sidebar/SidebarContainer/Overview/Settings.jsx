@@ -59,6 +59,8 @@ export default function Administrative() {
   const navigateTransactions    = () => navigate("/dashboard/transactions");
   const navigateBilling         = () => navigate("/dashboard/billing");
   const navigatePaymentLedger   = () => navigate("/dashboard/payment-ledger");
+  const navigateFilingTracker   = () => navigate("/dashboard/filing-tracker");
+  const navigateRevenueReport   = () => navigate("/dashboard/revenue-report");
 
   // ── Collapse toggles ────────────────────────────────────────────────────────
   const toggleMasterfile = () => setOpenMasterfile((prev) => !prev);
@@ -138,6 +140,16 @@ export default function Administrative() {
               activePath="/dashboard/clients"
               onClick={navigateClients}
             />
+            <CustomMenuButton
+              label="Client Filing"
+              activePath="/dashboard/clients"
+              onClick={navigateClients}
+            />
+            <CustomMenuButton
+              label="Filing Tracker"
+              activePath="/dashboard/filing-tracker"
+              onClick={navigateFilingTracker}
+            />
           </>
         }
       />
@@ -154,8 +166,14 @@ export default function Administrative() {
           activePath="/dashboard/clients"
           onClick={navigateClients}
         />
+        <ListBtn
+          label="Filing Tracker"
+          activePath="/dashboard/filing-tracker"
+          onClick={navigateFilingTracker}
+        />
       </Collapsebtn>
- {/* ══════════════════════ MASTERFILE ══════════════════════ */}
+
+      {/* ══════════════════════ TRANSACTIONS ══════════════════════ */}
       <StyledCollapsedButton
         id={id}
         onClick={toggleMasterfile}
@@ -183,7 +201,6 @@ export default function Administrative() {
               activePath="/dashboard/transactions"
               onClick={navigateTransactions}
             />
-            
           </>
         }
       />
@@ -195,8 +212,18 @@ export default function Administrative() {
           activePath="/dashboard/transactions"
           onClick={navigateTransactions}
         />
-        
       </Collapsebtn>
+
+      {/* ══════════════════════ REVENUE REPORT ══════════════════════ */}
+      <StyledCollapsedButton
+        id={id}
+        onClick={navigateRevenueReport}
+        IconChildren={<LayersIcon fontSize="small" />}
+        CollpaseBtnLabels="Revenue Report"
+        handlePopoverOpen={isVertical ? blackFunc : handleOpenMasterfileCollapse}
+        handlePopoverClose={handleCloseMasterfileCollapse}
+        {...btnColors}
+      />
 
     </>
   );

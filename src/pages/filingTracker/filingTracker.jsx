@@ -1,6 +1,6 @@
 // ============================================================
 // pages/filingTracker/FilingTracker.jsx
-// BIR Filing Monitor — easy-to-use redesign
+// BIR Filing Monitor — dark-mode adaptive
 // ============================================================
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
@@ -10,7 +10,7 @@ import {
   Collapse, Tooltip, Grid, InputAdornment, Snackbar, Alert,
   Skeleton, Badge, Dialog, DialogTitle, DialogContent, DialogActions,
   FormControlLabel, Checkbox, Divider, CircularProgress, Popover,
-  Stack,
+  Stack, useTheme,
 } from "@mui/material";
 import KeyboardArrowDownIcon    from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon      from "@mui/icons-material/KeyboardArrowUp";
@@ -32,7 +32,7 @@ import FilterListIcon           from "@mui/icons-material/FilterList";
 import { http }                 from "../../api/http";
 
 // ─────────────────────────────────────────────────────────────
-// CONSTANTS & HELPERS
+// HELPERS
 // ─────────────────────────────────────────────────────────────
 const TODAY    = new Date(); TODAY.setHours(0, 0, 0, 0);
 const fmtISO   = (d) => d.toISOString().slice(0, 10);
@@ -53,13 +53,45 @@ const deriveStatus = (deadlineDate, isFiled) => {
   return dl < 0 ? "Overdue" : dl <= 7 ? "Pending" : "Upcoming";
 };
 
-// Centralized status color system
-const S = {
-  Complete: { color: "#16A34A", bg: "#F0FDF4", border: "#86EFAC", chip: "#DCFCE7" },
-  Overdue:  { color: "#DC2626", bg: "#FEF2F2", border: "#FCA5A5", chip: "#FEE2E2" },
-  Pending:  { color: "#D97706", bg: "#FFFBEB", border: "#FCD34D", chip: "#FEF3C7" },
-  Upcoming: { color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE", chip: "#DBEAFE" },
-  Filed:    { color: "#16A34A", bg: "#F0FDF4", border: "#86EFAC", chip: "#DCFCE7" },
+// ─────────────────────────────────────────────────────────────
+// THEME-AWARE STATUS COLORS
+// ─────────────────────────────────────────────────────────────
+const useStatusColors = () => {
+  const { palette } = useTheme();
+  const dark = palette.mode === "dark";
+
+  return {
+    Complete: {
+      color:  dark ? "#4ADE80" : "#16A34A",
+      bg:     dark ? "rgba(74,222,128,0.08)"  : "#F0FDF4",
+      border: dark ? "rgba(74,222,128,0.25)"  : "#86EFAC",
+      chip:   dark ? "rgba(74,222,128,0.14)"  : "#DCFCE7",
+    },
+    Overdue: {
+      color:  dark ? "#F87171" : "#DC2626",
+      bg:     dark ? "rgba(248,113,113,0.08)" : "#FEF2F2",
+      border: dark ? "rgba(248,113,113,0.25)" : "#FCA5A5",
+      chip:   dark ? "rgba(248,113,113,0.14)" : "#FEE2E2",
+    },
+    Pending: {
+      color:  dark ? "#FCD34D" : "#D97706",
+      bg:     dark ? "rgba(252,211,77,0.08)"  : "#FFFBEB",
+      border: dark ? "rgba(252,211,77,0.25)"  : "#FCD34D",
+      chip:   dark ? "rgba(252,211,77,0.14)"  : "#FEF3C7",
+    },
+    Upcoming: {
+      color:  dark ? "#F87171" : "#DC2626",
+      bg:     dark ? "rgba(248,113,113,0.08)" : "#FEF2F2",
+      border: dark ? "rgba(248,113,113,0.25)" : "#FCA5A5",
+      chip:   dark ? "rgba(248,113,113,0.14)" : "#FEE2E2",
+    },
+    Filed: {
+      color:  dark ? "#4ADE80" : "#16A34A",
+      bg:     dark ? "rgba(74,222,128,0.08)"  : "#F0FDF4",
+      border: dark ? "rgba(74,222,128,0.25)"  : "#86EFAC",
+      chip:   dark ? "rgba(74,222,128,0.14)"  : "#DCFCE7",
+    },
+  };
 };
 
 const ALL_FORMS = [
@@ -86,26 +118,33 @@ const MONTHS   = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","N
 const QUARTERS = ["Q1 (Jan–Mar)","Q2 (Apr–Jun)","Q3 (Jul–Sep)","Q4 (Oct–Dec)"];
 
 // ─────────────────────────────────────────────────────────────
-// STATUS BADGE — reusable
+// STATUS BADGE
 // ─────────────────────────────────────────────────────────────
 function StatusBadge({ status, size = "small" }) {
+  const S = useStatusColors();
   const t = S[status] || S.Upcoming;
+  const fs = size === "small" ? 13 : 15;
   const icon = {
-    Complete: <CheckCircleIcon sx={{ fontSize: size === "small" ? 13 : 15 }} />,
-    Overdue:  <ErrorIcon sx={{ fontSize: size === "small" ? 13 : 15 }} />,
-    Pending:  <WarningAmberIcon sx={{ fontSize: size === "small" ? 13 : 15 }} />,
-    Upcoming: <RadioButtonUncheckedIcon sx={{ fontSize: size === "small" ? 13 : 15 }} />,
-    Filed:    <CheckCircleIcon sx={{ fontSize: size === "small" ? 13 : 15 }} />,
+    Complete:      <CheckCircleIcon sx={{ fontSize: fs }} />,
+    Overdue:       <ErrorIcon sx={{ fontSize: fs }} />,
+    Pending:       <WarningAmberIcon sx={{ fontSize: fs }} />,
+    Upcoming:      <ErrorIcon sx={{ fontSize: fs }} />,
+    "To Be Filed": <ErrorIcon sx={{ fontSize: fs }} />,
+    Filed:         <CheckCircleIcon sx={{ fontSize: fs }} />,
   }[status] || null;
 
+  const displayLabel = status === "Upcoming" ? "To Be Filed" : status;
+
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5,
+    <Box sx={{
+      display: "inline-flex", alignItems: "center", gap: 0.5,
       px: size === "small" ? 1 : 1.25, py: size === "small" ? 0.3 : 0.5,
       borderRadius: 99, bgcolor: t.chip, border: `1px solid ${t.border}`,
-      color: t.color, whiteSpace: "nowrap" }}>
+      color: t.color, whiteSpace: "nowrap",
+    }}>
       {icon}
       <Typography sx={{ fontSize: size === "small" ? "0.68rem" : "0.78rem", fontWeight: 700, color: t.color }}>
-        {status}
+        {displayLabel}
       </Typography>
     </Box>
   );
@@ -115,6 +154,9 @@ function StatusBadge({ status, size = "small" }) {
 // NOTIFICATION BELL
 // ─────────────────────────────────────────────────────────────
 function NotificationBell({ monitors }) {
+  const { palette } = useTheme();
+  const dark        = palette.mode === "dark";
+  const S           = useStatusColors();
   const [anchor, setAnchor] = useState(null);
 
   const notifs = monitors.flatMap((m) =>
@@ -123,18 +165,20 @@ function NotificationBell({ monitors }) {
   ).sort((a, b) => a.dl - b.dl);
 
   const overdueCount = notifs.filter((n) => n.dl < 0).length;
+  const pendingColor = S.Pending.color;
+  const pendingBg    = S.Pending.bg;
 
   return (
     <>
       <Tooltip title="Deadline Alerts">
         <IconButton size="small" onClick={(e) => setAnchor(e.currentTarget)} sx={{
           width: 38, height: 38, border: "1px solid",
-          borderColor: notifs.length > 0 ? "#F59E0B" : "divider",
-          bgcolor: notifs.length > 0 ? "#FFFBEB" : "background.paper",
+          borderColor: notifs.length > 0 ? pendingColor : "divider",
+          bgcolor: notifs.length > 0 ? pendingBg : "background.paper",
         }}>
           <Badge badgeContent={notifs.length} color={overdueCount > 0 ? "error" : "warning"}
             sx={{ "& .MuiBadge-badge": { fontSize: "0.58rem", minWidth: 15, height: 15 } }}>
-            <NotificationsIcon fontSize="small" sx={{ color: notifs.length > 0 ? "#D97706" : "text.secondary" }} />
+            <NotificationsIcon fontSize="small" sx={{ color: notifs.length > 0 ? pendingColor : "text.secondary" }} />
           </Badge>
         </IconButton>
       </Tooltip>
@@ -142,32 +186,40 @@ function NotificationBell({ monitors }) {
       <Popover open={Boolean(anchor)} anchorEl={anchor} onClose={() => setAnchor(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        PaperProps={{ sx: { width: 370, maxHeight: 460, display: "flex", flexDirection: "column",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.14)", borderRadius: 2.5 } }}>
-        <Box sx={{ px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1,
-          bgcolor: notifs.length > 0 ? "#FFFBEB" : "#FAFAFA",
-          borderBottom: "1px solid", borderColor: "divider" }}>
-          <NotificationsIcon fontSize="small" sx={{ color: "#D97706" }} />
+        PaperProps={{ sx: {
+          width: 370, maxHeight: 460, display: "flex", flexDirection: "column",
+          boxShadow: dark ? "0 8px 32px rgba(0,0,0,0.5)" : "0 8px 32px rgba(0,0,0,0.14)",
+          borderRadius: 2.5,
+        }}}>
+        <Box sx={{
+          px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1,
+          bgcolor: notifs.length > 0 ? pendingBg : "background.default",
+          borderBottom: "1px solid", borderColor: "divider",
+        }}>
+          <NotificationsIcon fontSize="small" sx={{ color: pendingColor }} />
           <Typography fontWeight={700} fontSize="0.9rem">Deadline Alerts</Typography>
           {overdueCount > 0 && <Chip label={`${overdueCount} overdue`} size="small" color="error"
             sx={{ ml: 0.5, fontWeight: 700, fontSize: "0.62rem", height: 18 }} />}
           <Chip label={notifs.length} size="small"
             sx={{ ml: "auto", fontWeight: 700, fontSize: "0.62rem", height: 18,
-              bgcolor: "#FEF3C7", color: "#D97706", border: "1px solid #FDE68A" }} />
+              bgcolor: S.Pending.chip, color: pendingColor, border: `1px solid ${S.Pending.border}` }} />
         </Box>
+
         <Box sx={{ overflowY: "auto", flex: 1 }}>
           {notifs.length === 0 ? (
             <Box sx={{ p: 5, textAlign: "center" }}>
-              <CheckCircleOutlineIcon sx={{ fontSize: 40, color: "success.main", mb: 1 }} />
+              <CheckCircleOutlineIcon sx={{ fontSize: 40, color: S.Complete.color, mb: 1 }} />
               <Typography variant="body2" fontWeight={700}>All caught up!</Typography>
               <Typography variant="caption" color="text.disabled">No filings due in the next 7 days.</Typography>
             </Box>
           ) : notifs.map((n) => {
             const isOv = n.dl < 0;
-            const t = isOv ? S.Overdue : S.Pending;
+            const t    = isOv ? S.Overdue : S.Pending;
             return (
-              <Box key={n.ID} sx={{ px: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider",
-                bgcolor: t.bg, "&:last-child": { borderBottom: 0 } }}>
+              <Box key={n.ID} sx={{
+                px: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider",
+                bgcolor: t.bg, "&:last-child": { borderBottom: 0 },
+              }}>
                 <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={1}>
                   <Box flex={1}>
                     <Typography variant="caption" fontWeight={700} color={t.color} display="block">
@@ -196,9 +248,13 @@ function NotificationBell({ monitors }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// EDIT DETAIL DIALOG — quick-file flow
+// EDIT DETAIL DIALOG
 // ─────────────────────────────────────────────────────────────
 function EditDetailDialog({ open, detail, onClose, onSave }) {
+  const S = useStatusColors();
+  const { palette } = useTheme();
+  const dark = palette.mode === "dark";
+
   const [isfiled,   setIsFiled]   = useState(false);
   const [fileddate, setFiledDate] = useState("");
   const [filedby,   setFiledBy]   = useState("");
@@ -220,6 +276,10 @@ function EditDetailDialog({ open, detail, onClose, onSave }) {
   const isCr = dl >= 0 && dl <= 3;
   const tc   = isOv ? S.Overdue : isCr ? S.Pending : S.Complete;
 
+  const indigoBg     = dark ? "rgba(99,102,241,0.15)" : "#EEF2FF";
+  const indigoBorder = dark ? "rgba(99,102,241,0.35)" : "#C7D2FE";
+  const indigoColor  = dark ? "#A5B4FC"               : "#4338CA";
+
   const handleSave = async () => {
     setSaving(true);
     await onSave({ id: detail.ID, isfiled, fileddate, filedby, remarks });
@@ -232,8 +292,9 @@ function EditDetailDialog({ open, detail, onClose, onSave }) {
       PaperProps={{ sx: { borderRadius: 3 } }}>
       <DialogTitle sx={{ pb: 1.5 }}>
         <Box display="flex" alignItems="center" gap={1.5}>
-          <Box sx={{ px: 1.25, py: 0.4, borderRadius: 1, bgcolor: "#EEF2FF", border: "1px solid #C7D2FE" }}>
-            <Typography fontFamily="monospace" fontWeight={800} fontSize="0.85rem" color="#4338CA">
+          <Box sx={{ px: 1.25, py: 0.4, borderRadius: 1,
+            bgcolor: indigoBg, border: `1px solid ${indigoBorder}` }}>
+            <Typography fontFamily="monospace" fontWeight={800} fontSize="0.85rem" color={indigoColor}>
               {detail.FormCode}
             </Typography>
           </Box>
@@ -245,7 +306,6 @@ function EditDetailDialog({ open, detail, onClose, onSave }) {
       </DialogTitle>
 
       <DialogContent sx={{ pt: 0 }}>
-        {/* Deadline banner */}
         <Box sx={{ p: 2, borderRadius: 2, mb: 2.5, border: "1px solid",
           bgcolor: tc.bg, borderColor: tc.border,
           display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -263,11 +323,12 @@ function EditDetailDialog({ open, detail, onClose, onSave }) {
           </Box>
         </Box>
 
-        {/* Filed toggle */}
-        <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2, cursor: "pointer",
-          bgcolor: isfiled ? "#F0FDF4" : "background.paper",
-          borderColor: isfiled ? "#86EFAC" : "divider",
-          transition: "all 0.15s" }}
+        <Paper variant="outlined" sx={{
+          p: 2, mb: 2, borderRadius: 2, cursor: "pointer",
+          bgcolor: isfiled ? S.Complete.bg : "background.paper",
+          borderColor: isfiled ? S.Complete.border : "divider",
+          transition: "all 0.15s",
+        }}
           onClick={() => {
             const next = !isfiled;
             setIsFiled(next);
@@ -279,7 +340,7 @@ function EditDetailDialog({ open, detail, onClose, onSave }) {
               onChange={() => {}} onClick={(e) => e.stopPropagation()} />}
             label={
               <Box>
-                <Typography fontWeight={700} color={isfiled ? "#16A34A" : "text.primary"}>
+                <Typography fontWeight={700} color={isfiled ? S.Complete.color : "text.primary"}>
                   {isfiled ? "✓ Marked as Filed" : "Mark as Filed"}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -327,6 +388,9 @@ function EditDetailDialog({ open, detail, onClose, onSave }) {
 // ADD MONITOR DIALOG
 // ─────────────────────────────────────────────────────────────
 function AddMonitorDialog({ open, onClose, onAdd, clients }) {
+  const { palette } = useTheme();
+  const dark = palette.mode === "dark";
+
   const [clientid,     setClientId]     = useState("");
   const [periodtype,   setPeriodType]   = useState("Monthly");
   const [periodyear,   setPeriodYear]   = useState(new Date().getFullYear());
@@ -361,6 +425,9 @@ function AddMonitorDialog({ open, onClose, onAdd, clients }) {
               || (c.ClientID||"").toLowerCase().includes(q);
   });
 
+  const codeBg     = dark ? "rgba(251,191,36,0.15)" : "#FEF9C3";
+  const codeColor  = dark ? "#FCD34D"               : "#B45309";
+
   const handleAdd = () => {
     if (!clientid)        return setErr("Please select a client.");
     if (!selected.length) return setErr("Select at least one BIR form.");
@@ -384,7 +451,6 @@ function AddMonitorDialog({ open, onClose, onAdd, clients }) {
       <DialogContent sx={{ pt: 2.5 }}>
         {err && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{err}</Alert>}
 
-        {/* Period setup */}
         <Typography variant="caption" fontWeight={700} sx={{ textTransform: "uppercase",
           letterSpacing: "0.08em", color: "text.secondary", display: "block", mb: 1 }}>
           Period Setup
@@ -441,7 +507,6 @@ function AddMonitorDialog({ open, onClose, onAdd, clients }) {
 
         <Divider sx={{ mb: 2 }} />
 
-        {/* Form selection */}
         <Box display="flex" alignItems="center" gap={1.5} mb={2}>
           <Typography variant="caption" fontWeight={700} sx={{ textTransform: "uppercase",
             letterSpacing: "0.08em", color: "text.secondary" }}>
@@ -478,7 +543,7 @@ function AddMonitorDialog({ open, onClose, onAdd, clients }) {
                       label={
                         <Typography variant="caption">
                           <Box component="span" fontFamily="monospace" fontWeight={800}
-                            sx={{ color: "#B45309", bgcolor: "#FEF9C3", px: 0.5, borderRadius: 0.5 }}>
+                            sx={{ color: codeColor, bgcolor: codeBg, px: 0.5, borderRadius: 0.5 }}>
                             {f.code}
                           </Box>
                           {" "}{f.name}{" "}
@@ -507,35 +572,45 @@ function AddMonitorDialog({ open, onClose, onAdd, clients }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// DETAIL PANEL — inline inside expanded row
+// DETAIL PANEL
 // ─────────────────────────────────────────────────────────────
 function DetailPanel({ monitor, onEditDetail }) {
-  const cats = [...new Set((monitor.Details||[]).map((d) => d.Category))];
+  const S           = useStatusColors();
+  const { palette } = useTheme();
+  const dark        = palette.mode === "dark";
+  const cats        = [...new Set((monitor.Details||[]).map((d) => d.Category))];
+
+  const panelBg    = dark ? palette.background.default : "#F8FAFF";
+  const panelBorder = dark ? palette.divider : "#E8EDFF";
+  const cardBg     = dark ? palette.background.paper : "#FFFFFF";
+  const rowBorder  = dark ? palette.divider : "#E5E7EB";
 
   return (
-    <Box sx={{ bgcolor: "#F8FAFF", borderTop: "2px solid #E8EDFF", p: 3 }}>
+    <Box sx={{ bgcolor: panelBg, borderTop: `2px solid ${panelBorder}`, p: 3 }}>
       {/* Quick stats bar */}
       <Box display="flex" alignItems="center" gap={3} mb={3} flexWrap="wrap">
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, p: 1.5, borderRadius: 2,
-          bgcolor: "white", border: "1px solid #E5E7EB", minWidth: 120 }}>
-          <CheckCircleIcon sx={{ color: "#16A34A", fontSize: 20 }} />
+          bgcolor: cardBg, border: `1px solid ${rowBorder}`, minWidth: 120 }}>
+          <CheckCircleIcon sx={{ color: S.Complete.color, fontSize: 20 }} />
           <Box>
             <Typography fontSize="0.65rem" color="text.secondary">Filed</Typography>
-            <Typography fontWeight={800} fontSize="1rem" color="#16A34A">
+            <Typography fontWeight={800} fontSize="1rem" color={S.Complete.color}>
               {monitor.FiledCount}/{monitor.TotalForms}
             </Typography>
           </Box>
         </Box>
+
         {monitor.OverdueCount > 0 && (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, p: 1.5, borderRadius: 2,
-            bgcolor: "#FEF2F2", border: "1px solid #FCA5A5", minWidth: 100 }}>
-            <ErrorIcon sx={{ color: "#DC2626", fontSize: 20 }} />
+            bgcolor: S.Overdue.bg, border: `1px solid ${S.Overdue.border}`, minWidth: 100 }}>
+            <ErrorIcon sx={{ color: S.Overdue.color, fontSize: 20 }} />
             <Box>
-              <Typography fontSize="0.65rem" color="#DC2626">Overdue</Typography>
-              <Typography fontWeight={800} fontSize="1rem" color="#DC2626">{monitor.OverdueCount}</Typography>
+              <Typography fontSize="0.65rem" color={S.Overdue.color}>Overdue</Typography>
+              <Typography fontWeight={800} fontSize="1rem" color={S.Overdue.color}>{monitor.OverdueCount}</Typography>
             </Box>
           </Box>
         )}
+
         <Box sx={{ flex: 1, minWidth: 200 }}>
           <Box display="flex" justifyContent="space-between" mb={0.5}>
             <Typography variant="caption" color="text.secondary">Overall progress</Typography>
@@ -545,59 +620,59 @@ function DetailPanel({ monitor, onEditDetail }) {
             color={monitor.ProgressPct === 100 ? "success" : monitor.OverdueCount > 0 ? "error" : "warning"}
             sx={{ height: 8, borderRadius: 4 }} />
         </Box>
+
         {monitor.Remarks && (
-          <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: "#FFFBEB", border: "1px solid #FCD34D", maxWidth: 240 }}>
+          <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: S.Pending.bg, border: `1px solid ${S.Pending.border}`, maxWidth: 240 }}>
             <Typography variant="caption" color="text.secondary" display="block">Remarks</Typography>
-            <Typography variant="caption">{monitor.Remarks}</Typography>
+            <Typography variant="caption" color="text.primary">{monitor.Remarks}</Typography>
           </Box>
         )}
       </Box>
 
-      {/* Form rows grouped by category */}
+      {/* Form rows by category */}
       {cats.map((cat) => {
         const rows = (monitor.Details||[]).filter((d) => d.Category === cat);
         return (
           <Box key={cat} mb={2.5}>
             <Box display="flex" alignItems="center" gap={1} mb={1}>
-              <Box sx={{ width: 3, height: 16, borderRadius: 1, bgcolor: "#2563EB" }} />
+              <Box sx={{ width: 3, height: 16, borderRadius: 1, bgcolor: "primary.main" }} />
               <Typography variant="caption" fontWeight={700} color="primary.main"
                 sx={{ textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 {cat}
               </Typography>
             </Box>
 
-            <Paper elevation={0} sx={{ border: "1px solid #E5E7EB", borderRadius: 2, overflow: "hidden" }}>
+            <Paper elevation={0} sx={{ border: `1px solid ${rowBorder}`, borderRadius: 2, overflow: "hidden" }}>
               {rows.map((d, idx) => {
-                const st   = deriveStatus(d.DeadlineDate, d.IsFiled);
-                const dl   = daysLeft(d.DeadlineDate);
-                const tc   = S[st === "Filed" ? "Complete" : st] || S.Upcoming;
+                const st     = deriveStatus(d.DeadlineDate, d.IsFiled);
+                const dl     = daysLeft(d.DeadlineDate);
+                const tc     = S[st === "Filed" ? "Complete" : st] || S.Upcoming;
                 const isLast = idx === rows.length - 1;
+
                 return (
                   <Box key={d.ID} sx={{
-                    display: "flex", alignItems: "center", gap: 2, px: 2, py: 1.5,
+                    display: "flex", alignItems: "center", gap: 2,
+                    px: 2, py: 1.5,
                     bgcolor: tc.bg,
-                    borderBottom: isLast ? 0 : "1px solid #E5E7EB",
+                    borderBottom: isLast ? 0 : `1px solid ${rowBorder}`,
                     borderLeft: `4px solid ${tc.color}`,
-                    transition: "bgcolor 0.15s",
                   }}>
-                    {/* Form code */}
                     <Box sx={{ minWidth: 80, flexShrink: 0 }}>
                       <Typography fontFamily="monospace" fontWeight={800} fontSize="0.82rem" color={tc.color}>
                         {d.FormCode}
                       </Typography>
                     </Box>
 
-                    {/* Form name */}
                     <Typography variant="caption" color="text.secondary" sx={{
-                      flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
                       {d.FormName}
                     </Typography>
 
-                    {/* Deadline or filed date */}
                     <Box sx={{ textAlign: "right", minWidth: 130, flexShrink: 0 }}>
                       {d.IsFiled ? (
                         <>
-                          <Typography variant="caption" fontWeight={600} color="#16A34A" display="block">
+                          <Typography variant="caption" fontWeight={600} color={S.Complete.color} display="block">
                             ✓ Filed {fmtDate(d.FiledDate)}
                           </Typography>
                           {d.FiledBy && (
@@ -619,18 +694,18 @@ function DetailPanel({ monitor, onEditDetail }) {
                       )}
                     </Box>
 
-                    {/* Status badge */}
                     <Box sx={{ minWidth: 90, flexShrink: 0 }}>
                       <StatusBadge status={d.IsFiled ? "Filed" : st} />
                     </Box>
 
-                    {/* Edit button */}
                     <Tooltip title="Edit filing status">
                       <Button size="small" variant="outlined" startIcon={<EditIcon sx={{ fontSize: "13px !important" }} />}
                         onClick={() => onEditDetail(d)}
                         sx={{ borderRadius: 1.5, fontSize: "0.68rem", py: 0.4, px: 1.25, flexShrink: 0,
-                          borderColor: tc.border, color: tc.color, bgcolor: "white",
-                          "&:hover": { bgcolor: tc.chip, borderColor: tc.color } }}>
+                          borderColor: tc.border, color: tc.color,
+                          bgcolor: dark ? "transparent" : "background.paper",
+                          "&:hover": { bgcolor: tc.chip, borderColor: tc.color },
+                        }}>
                         Update
                       </Button>
                     </Tooltip>
@@ -649,52 +724,65 @@ function DetailPanel({ monitor, onEditDetail }) {
 // MONITOR ROW
 // ─────────────────────────────────────────────────────────────
 function MonitorRow({ monitor, rowNum, onEditDetail, onDelete }) {
+  const S           = useStatusColors();
+  const { palette } = useTheme();
+  const dark        = palette.mode === "dark";
   const [open, setOpen] = useState(false);
+
   const client     = monitor.Client || {};
   const pct        = monitor.ProgressPct || 0;
   const t          = S[monitor.OverallStatus] || S.Upcoming;
   const isComplete = monitor.OverallStatus === "Complete";
   const isOverdue  = monitor.OverallStatus === "Overdue";
 
+  const rowBg      = isComplete ? S.Complete.bg : isOverdue ? S.Overdue.bg : "inherit";
+  const rowHoverBg = isComplete ? S.Complete.chip : isOverdue ? S.Overdue.chip :
+                     dark ? "rgba(255,255,255,0.04)" : "#F5F8FF";
+
+  const indigoBg     = dark ? "rgba(99,102,241,0.15)" : "#EEF2FF";
+  const indigoBorder = dark ? "rgba(99,102,241,0.30)" : "#C7D2FE";
+  const indigoColor  = dark ? "#A5B4FC"               : "#4338CA";
+
+  const expandActiveBg = dark ? "rgba(99,102,241,0.15)" : "#EEF2FF";
+
   return (
     <>
       <TableRow hover onClick={() => setOpen((o) => !o)} sx={{
         cursor: "pointer",
-        bgcolor: isComplete ? "#FAFFFE" : isOverdue ? "#FFFAFA" : "inherit",
+        bgcolor: rowBg,
         "& > td:first-of-type": { borderLeft: `3px solid ${t.color}` },
-        "&:hover > td": { bgcolor: isComplete ? "#F0FDF4 !important" : isOverdue ? "#FEF2F2 !important" : "#F5F8FF !important" },
+        "&:hover > td": { bgcolor: `${rowHoverBg} !important` },
         transition: "background-color 0.1s",
       }}>
-        {/* Expand */}
         <TableCell sx={{ width: 48, pl: 1.5, pr: 0 }}>
           <IconButton size="small" onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
             sx={{ color: open ? "primary.main" : "text.secondary",
-              bgcolor: open ? "#EEF2FF" : "transparent", borderRadius: 1.5 }}>
+              bgcolor: open ? expandActiveBg : "transparent", borderRadius: 1.5 }}>
             {open ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
           </IconButton>
         </TableCell>
 
-        {/* # */}
-        <TableCell sx={{ width: 36, color: "text.disabled", fontFamily: "monospace",
-          fontSize: "0.7rem", pl: 0 }}>
-          {String(rowNum).padStart(2,"0")}
+        <TableCell sx={{ width: 36, color: "text.disabled", fontFamily: "monospace", fontSize: "0.7rem", pl: 0 }}>
+          {String(rowNum).padStart(2, "0")}
         </TableCell>
 
-        {/* Client */}
         <TableCell sx={{ py: 1.75 }}>
-          <Typography variant="body2" fontWeight={700} fontSize="0.88rem">{client.TradeName || client.LNF || "—"}</Typography>
+          <Typography variant="body2" fontWeight={700} fontSize="0.88rem">
+            {client.TradeName || client.LNF || "—"}
+          </Typography>
           <Box display="flex" alignItems="center" gap={1} mt={0.25}>
             <Typography variant="caption" color="text.secondary" fontFamily="monospace" fontSize="0.68rem">
               {client.ClientID}
             </Typography>
             {client.Type && (
-              <Chip label={client.Type} size="small" sx={{ fontSize: "0.58rem", height: 16, fontWeight: 600,
-                bgcolor: "#EEF2FF", color: "#4338CA", border: "1px solid #C7D2FE" }} />
+              <Chip label={client.Type} size="small" sx={{
+                fontSize: "0.58rem", height: 16, fontWeight: 600,
+                bgcolor: indigoBg, color: indigoColor, border: `1px solid ${indigoBorder}`,
+              }} />
             )}
           </Box>
         </TableCell>
 
-        {/* Period */}
         <TableCell sx={{ py: 1.75 }}>
           <Box display="flex" alignItems="center" gap={0.75}>
             <CalendarTodayIcon sx={{ fontSize: 13, color: "text.secondary" }} />
@@ -703,7 +791,6 @@ function MonitorRow({ monitor, rowNum, onEditDetail, onDelete }) {
           <Typography variant="caption" color="text.disabled" fontSize="0.68rem">{monitor.PeriodType}</Typography>
         </TableCell>
 
-        {/* Form chips */}
         <TableCell sx={{ py: 1.75 }}>
           <Box display="flex" flexWrap="wrap" gap={0.4}>
             {(monitor.Details||[]).slice(0, 6).map((d) => {
@@ -718,12 +805,14 @@ function MonitorRow({ monitor, rowNum, onEditDetail, onDelete }) {
             })}
             {(monitor.Details?.length||0) > 6 && (
               <Chip label={`+${monitor.Details.length-6} more`} size="small"
-                sx={{ fontSize: "0.6rem", height: 20, bgcolor: "#F3F4F6", color: "text.secondary" }} />
+                sx={{ fontSize: "0.6rem", height: 20,
+                  bgcolor: dark ? "rgba(255,255,255,0.08)" : "#F3F4F6",
+                  color: "text.secondary",
+                }} />
             )}
           </Box>
         </TableCell>
 
-        {/* Progress */}
         <TableCell sx={{ minWidth: 170, py: 1.75 }}>
           <Box display="flex" alignItems="center" gap={1} mb={0.5}>
             <LinearProgress variant="determinate" value={pct}
@@ -736,23 +825,21 @@ function MonitorRow({ monitor, rowNum, onEditDetail, onDelete }) {
           <Typography variant="caption" color="text.secondary" fontSize="0.68rem">
             {monitor.FiledCount}/{monitor.TotalForms} filed
             {monitor.OverdueCount > 0 && (
-              <Box component="span" sx={{ color: "#DC2626", ml: 0.75, fontWeight: 700 }}>
+              <Box component="span" sx={{ color: S.Overdue.color, ml: 0.75, fontWeight: 700 }}>
                 · {monitor.OverdueCount} overdue
               </Box>
             )}
           </Typography>
         </TableCell>
 
-        {/* Status */}
         <TableCell sx={{ py: 1.75 }}>
           <StatusBadge status={monitor.OverallStatus} />
         </TableCell>
 
-        {/* Delete */}
         <TableCell sx={{ width: 52 }} onClick={(e) => e.stopPropagation()}>
           <Tooltip title="Delete monitor record">
             <IconButton size="small" color="error"
-              sx={{ opacity: 0.3, "&:hover": { opacity: 1, bgcolor: "#FEF2F2" } }}
+              sx={{ opacity: 0.3, "&:hover": { opacity: 1, bgcolor: S.Overdue.bg } }}
               onClick={() => onDelete(monitor.ID)}>
               <DeleteOutlineIcon sx={{ fontSize: 18 }} />
             </IconButton>
@@ -760,7 +847,6 @@ function MonitorRow({ monitor, rowNum, onEditDetail, onDelete }) {
         </TableCell>
       </TableRow>
 
-      {/* Detail panel row */}
       <TableRow>
         <TableCell colSpan={8} sx={{ p: 0, border: open ? undefined : 0 }}>
           <Collapse in={open} timeout="auto" unmountOnExit>
@@ -776,6 +862,10 @@ function MonitorRow({ monitor, rowNum, onEditDetail, onDelete }) {
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────
 export default function FilingTracker() {
+  const S           = useStatusColors();
+  const { palette } = useTheme();
+  const dark        = palette.mode === "dark";
+
   const [monitors,       setMonitors]       = useState([]);
   const [clients,        setClients]        = useState([]);
   const [loading,        setLoading]        = useState(true);
@@ -880,16 +970,32 @@ export default function FilingTracker() {
     return (
       (!q || (c.TradeName||"").toLowerCase().includes(q) || (c.LNF||"").toLowerCase().includes(q) || (c.ClientID||"").toLowerCase().includes(q)) &&
       (!filterStatus || m.OverallStatus===filterStatus) &&
-      (!filterPeriod || m.PeriodType===filterPeriod)
+      (!filterPeriod  || m.PeriodType===filterPeriod)
     );
   });
 
+  // ── Counter pills: Complete, Not Filed (Overdue), To Be Filled (Upcoming) ──
   const counts = {
-    Complete: monitors.filter((m) => m.OverallStatus==="Complete").length,
-    Overdue:  monitors.filter((m) => m.OverallStatus==="Overdue").length,
-    Pending:  monitors.filter((m) => m.OverallStatus==="Pending").length,
-    Upcoming: monitors.filter((m) => m.OverallStatus==="Upcoming").length,
+    Complete:      monitors.filter((m) => m.OverallStatus === "Complete").length,
+    "Not Filed":   monitors.filter((m) => m.OverallStatus === "Overdue").length,
+    "To Be Filed": monitors.filter((m) => m.OverallStatus === "Upcoming").length,
   };
+
+  // Map display label → actual OverallStatus value for filtering
+  const labelToStatus = {
+    Complete:      "Complete",
+    "Not Filed":   "Overdue",
+    "To Be Filed": "Upcoming",
+  };
+
+  // Map display label → color palette key
+  const labelToColor = {
+    Complete:      "Complete",
+    "Not Filed":   "Overdue",
+    "To Be Filed": "Upcoming",
+  };
+
+  const theadBg = dark ? palette.background.default : "#F8FAFF";
 
   return (
     <Box>
@@ -900,7 +1006,7 @@ export default function FilingTracker() {
             BIR Filing Monitor
           </Typography>
           <Typography variant="body2" color="text.secondary" mt={0.25}>
-            Track filings by client and period · Click any row to expand details · Refreshes every 5 min
+            Track filings by client and period · Click any row to expand · Refreshes every 5 min
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} alignItems="center">
@@ -923,29 +1029,30 @@ export default function FilingTracker() {
         </Stack>
       </Box>
 
-      {/* ── Status filter pills (clickable) ── */}
-      <Box display="flex" gap={1} mb={2.5} flexWrap="wrap" alignItems="center">
-        <FilterListIcon sx={{ fontSize: 16, color: "text.disabled" }} />
-        <Typography variant="caption" color="text.disabled" fontWeight={600} sx={{ mr: 0.5 }}>Filter:</Typography>
-        {Object.entries(counts).map(([status, count]) => {
-          const t      = S[status];
-          const active = filterStatus === status;
+      {/* ── Clickable status filter pills ── */}
+      <Box display="flex" gap={1.5} mb={2.5} flexWrap="wrap" alignItems="center">
+        <FilterListIcon sx={{ fontSize: 20, color: "text.disabled" }} />
+        <Typography variant="body2" color="text.disabled" fontWeight={700} sx={{ mr: 0.5 }}>Filter:</Typography>
+        {Object.entries(counts).map(([label, count]) => {
+          const colorKey = labelToColor[label];
+          const t        = S[colorKey];
+          const active   = filterStatus === labelToStatus[label];
           return (
-            <Box key={status} onClick={() => setFS(active ? "" : status)} sx={{
-              display: "inline-flex", alignItems: "center", gap: 0.75,
-              px: 1.25, py: 0.5, borderRadius: 99, cursor: "pointer", userSelect: "none",
-              border: "1.5px solid", transition: "all 0.15s",
+            <Box key={label} onClick={() => setFS(active ? "" : labelToStatus[label])} sx={{
+              display: "inline-flex", alignItems: "center", gap: 1,
+              px: 2, py: 1, borderRadius: 99, cursor: "pointer", userSelect: "none",
+              border: "2px solid", transition: "all 0.15s",
               bgcolor: active ? t.chip : "background.paper",
-              borderColor: active ? t.color : "#E5E7EB",
+              borderColor: active ? t.color : "divider",
               "&:hover": { borderColor: t.color, bgcolor: t.chip },
             }}>
-              <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: t.color }} />
-              <Typography variant="caption" fontWeight={700} color={active ? t.color : "text.secondary"}>
-                {status}
+              <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: t.color }} />
+              <Typography variant="body2" fontWeight={700} fontSize="0.88rem" color={active ? t.color : "text.secondary"}>
+                {label}
               </Typography>
-              <Box sx={{ px: 0.6, borderRadius: 0.75,
-                bgcolor: active ? t.color : "#F3F4F6" }}>
-                <Typography variant="caption" fontWeight={800} fontSize="0.62rem"
+              <Box sx={{ px: 0.9, py: 0.2, borderRadius: 1,
+                bgcolor: active ? t.color : dark ? "rgba(255,255,255,0.08)" : "#F3F4F6" }}>
+                <Typography variant="caption" fontWeight={800} fontSize="0.75rem"
                   color={active ? "white" : "text.secondary"}>
                   {count}
                 </Typography>
@@ -961,7 +1068,7 @@ export default function FilingTracker() {
         )}
       </Box>
 
-      {/* ── Search + period ── */}
+      {/* ── Search + period filter ── */}
       <Box display="flex" gap={1.5} mb={2} flexWrap="wrap" alignItems="center">
         <TextField size="small" placeholder="Search by client name or ID…" value={search}
           onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 260 }}
@@ -986,7 +1093,7 @@ export default function FilingTracker() {
         sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2.5, overflow: "hidden" }}>
         <Table size="small">
           <TableHead>
-            <TableRow sx={{ bgcolor: "#F8FAFF" }}>
+            <TableRow sx={{ bgcolor: theadBg }}>
               <TableCell sx={{ width: 48, borderBottom: "2px solid", borderColor: "divider" }} />
               <TableCell sx={{ width: 36, fontWeight: 700, fontSize: "0.7rem", color: "text.disabled",
                 borderBottom: "2px solid", borderColor: "divider" }}>#</TableCell>
@@ -1008,7 +1115,9 @@ export default function FilingTracker() {
               ? Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     {Array.from({ length: 8 }).map((__, j) => (
-                      <TableCell key={j} sx={{ py: 1.5 }}><Skeleton height={28} sx={{ borderRadius: 1 }} /></TableCell>
+                      <TableCell key={j} sx={{ py: 1.5 }}>
+                        <Skeleton height={28} sx={{ borderRadius: 1 }} />
+                      </TableCell>
                     ))}
                   </TableRow>
                 ))
@@ -1016,7 +1125,7 @@ export default function FilingTracker() {
                 ? (
                   <TableRow>
                     <TableCell colSpan={8} align="center" sx={{ py: 10 }}>
-                      <CheckCircleOutlineIcon sx={{ fontSize: 44, color: "#CBD5E1", mb: 1.5, display: "block", mx: "auto" }} />
+                      <CheckCircleOutlineIcon sx={{ fontSize: 44, color: "text.disabled", mb: 1.5, display: "block", mx: "auto" }} />
                       <Typography fontWeight={700} color="text.secondary" mb={0.5}>No records found</Typography>
                       <Typography variant="caption" color="text.disabled">
                         Try adjusting your search or status filter
