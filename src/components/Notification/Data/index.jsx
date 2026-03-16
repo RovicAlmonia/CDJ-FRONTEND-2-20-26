@@ -1,7 +1,12 @@
 // Notification/Data/index.jsx
+<<<<<<< HEAD
 // Merged: regular system notifications + BIR filing deadline alerts
 
 import { Box, ListItemText, Stack, Typography, Skeleton, Chip } from "@mui/material";
+=======
+
+import { Box, ListItemText, Stack, Typography, Skeleton } from "@mui/material";
+>>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
 import NotifButton from "../NotifComponent";
 import DataContainer from "../NotifComponent/Container";
 import Identification from "../NotifComponent/Identification";
@@ -12,6 +17,7 @@ import { http } from "../../../api/http";
 import SkeletonAvatar from "../NotifComponent/SkeletonAvatar";
 import NoNotificationIcon from '../../../assets/images/no-alarm.png';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+<<<<<<< HEAD
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ErrorIcon from "@mui/icons-material/Error";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
@@ -46,22 +52,30 @@ const periodLabel = (hdr) => {
 };
 
 // ── API calls ─────────────────────────────────────────────────────────────────
+=======
+
+// ── API calls ────────────────────────────────────────────────────────────────
+>>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
 
 const fetchNotifications = async () => {
   const res = await http.get('/get-notifications');
   return res?.data?.data ?? res?.data ?? [];
 };
 
+<<<<<<< HEAD
 const fetchMonitors = async () => {
   const res = await http.get('/selectmonitors');
   return res?.data?.data ?? [];
 };
 
+=======
+>>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
 const markReadRequest = async (id) => {
   const res = await http.post(`/mark-notification-read?id=${id}`);
   return res.data;
 };
 
+<<<<<<< HEAD
 // ── Build BIR alert objects from monitors ────────────────────────────────────
 // Surfaces any unfiled form with a deadline within the next 7 days (or already overdue).
 
@@ -218,18 +232,25 @@ const BirAlertItem = ({ alert }) => {
   );
 };
 
+=======
+>>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const NotificationData = () => {
   const queryClient = useQueryClient();
 
+<<<<<<< HEAD
   // Regular system notifications
   const { data: notifications = [], isLoading: notifsLoading } = useQuery({
+=======
+  const { data: notifications = [], isLoading } = useQuery({
+>>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
     queryKey: ['notifications'],
     queryFn: fetchNotifications,
     refetchInterval: 30_000,
   });
 
+<<<<<<< HEAD
   // BIR monitors (for deadline alerts)
   const { data: monitors = [], isLoading: monitorsLoading } = useQuery({
     queryKey: ['monitors-notif'],
@@ -245,6 +266,11 @@ const NotificationData = () => {
   // BIR deadline alerts (overdue or due within 7 days)
   const birAlerts = buildBirAlerts(monitors);
 
+=======
+  // Only show pending (notif_status === 0) notifications
+  const unRead = notifications.filter((n) => n.notif_status === 0);
+
+>>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['notifications'] });
 
@@ -253,9 +279,13 @@ const NotificationData = () => {
     onSuccess: invalidate,
   });
 
+<<<<<<< HEAD
   const totalCount = unRead.length + birAlerts.length;
 
   // ── Loading skeleton ────────────────────────────────────────────────────────
+=======
+  // ── Loading skeleton ──────────────────────────────────────────────────────
+>>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
 
   if (isLoading) {
     return (
@@ -281,6 +311,7 @@ const NotificationData = () => {
     );
   }
 
+<<<<<<< HEAD
   // ── Empty state ─────────────────────────────────────────────────────────────
 
   if (totalCount === 0) {
@@ -295,6 +326,17 @@ const NotificationData = () => {
           height: '85vh',
         }}
       >
+=======
+  // ── Empty state ───────────────────────────────────────────────────────────
+
+  if (unRead.length === 0) {
+    return (
+      <Box sx={{
+        display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', alignItems: 'center',
+        gap: 1.5, height: '85vh',
+      }}>
+>>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
         <img
           src={NoNotificationIcon}
           style={{ height: '5%', width: '10%' }}
@@ -307,6 +349,7 @@ const NotificationData = () => {
     );
   }
 
+<<<<<<< HEAD
   // ── Notification list ───────────────────────────────────────────────────────
   // Order: overdue BIR alerts first → pending BIR alerts → regular system notifs
 
@@ -341,6 +384,12 @@ const NotificationData = () => {
       )}
 
       {/* Regular system notifications */}
+=======
+  // ── Notification list ─────────────────────────────────────────────────────
+
+  return (
+    <>
+>>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
       {unRead.map((notif, index) => (
         <ListContainer key={notif.id ?? index}>
           <NotifButton>
@@ -356,6 +405,7 @@ const NotificationData = () => {
                     {notif.first_name} {notif.last_name} — {notif.id_number}
                   </Typography>
                 </Box>
+<<<<<<< HEAD
                 <Stack
                   sx={{
                     display: 'flex',
@@ -377,6 +427,19 @@ const NotificationData = () => {
                       borderRadius: '50%',
                     }}
                   />
+=======
+                <Stack sx={{
+                  display: 'flex', flexDirection: 'row', alignItems: 'center',
+                  lineHeight: 1.5, fontSize: '0.75rem', fontWeight: 400,
+                }}>
+                  <ReactTimeAgo date={new Date(notif.time_created).getTime()} />
+                  <Box sx={{
+                    width: '2px', height: '2px',
+                    backgroundColor: 'currentcolor',
+                    marginLeft: '4px', marginRight: '4px',
+                    borderRadius: '50%',
+                  }} />
+>>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
                   {notif.type_of_notification}
                 </Stack>
               </ListItemText>
