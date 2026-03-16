@@ -52,11 +52,13 @@ const emptyForm = {
   clientid: "",
   gross: "",
   discount: "",
+  servicefee: "",
   net: "",
   paymentamount: "",
   paymentdate: null,
   paymentmethod: "",
   paymentreference: "",
+  bankname: "",
   paymentstatus: "Unpaid",
   _carryForwardBalance: 0,
   _newMonthGross: 0,
@@ -122,10 +124,11 @@ export default function BillingInt() {
     page * rowsPerPage + rowsPerPage
   );
 
-  const grandGross    = enrichedList.reduce((s, r) => s + parseFloat(r.Gross         || 0), 0);
-  const grandDiscount = enrichedList.reduce((s, r) => s + parseFloat(r.Discount      || 0), 0);
-  const grandNet      = enrichedList.reduce((s, r) => s + parseFloat(r.Net           || 0), 0);
-  const grandPaid     = enrichedList.reduce((s, r) => s + parseFloat(r.PaymentAmount || 0), 0);
+  const grandGross      = enrichedList.reduce((s, r) => s + parseFloat(r.Gross         || 0), 0);
+  const grandDiscount   = enrichedList.reduce((s, r) => s + parseFloat(r.Discount      || 0), 0);
+  const grandServiceFee = enrichedList.reduce((s, r) => s + parseFloat(r.ServiceFee    || 0), 0);
+  const grandNet        = enrichedList.reduce((s, r) => s + parseFloat(r.Net           || 0), 0);
+  const grandPaid       = enrichedList.reduce((s, r) => s + parseFloat(r.PaymentAmount || 0), 0);
 
   const getCarryForwardBalance = (clientId, excludeBillingId = null) => {
     const clientBillings = billingList.filter(
@@ -140,6 +143,15 @@ export default function BillingInt() {
     const net  = parseFloat(latest.Net           || 0);
     const paid = parseFloat(latest.PaymentAmount || 0);
     return Math.max(0, net - paid);
+  };
+
+  // ── Recalculate net from current form values ──────────────────
+  const recalcNet = (gross, discount, servicefee, carry) => {
+    const g  = parseFloat(gross      || 0);
+    const d  = parseFloat(discount   || 0);
+    const sf = parseFloat(servicefee || 0);
+    const c  = parseFloat(carry      || 0);
+    return (g - d + sf + c).toFixed(2);
   };
 
   const handleChange = (field, value) => {
@@ -174,10 +186,12 @@ export default function BillingInt() {
         const newMonthDiscount = isLatestPaid ? 0 : clientTxns.reduce((s, t) => s + parseFloat(t.Discount   || 0), 0);
         const newMonthNet      = isLatestPaid ? 0 : clientTxns.reduce((s, t) => s + parseFloat(t.NetTotal   || 0), 0);
         const carryForward     = isLatestPaid ? 0 : getCarryForwardBalance(value);
-        const totalNet         = newMonthNet + carryForward;
+        const serviceFee       = 0; // default 0 when switching client
+        const totalNet         = newMonthNet + carryForward + serviceFee;
 
         updated.gross                  = newMonthGross.toFixed(2);
         updated.discount               = newMonthDiscount.toFixed(2);
+        updated.servicefee             = "0.00";
         updated.net                    = totalNet.toFixed(2);
         updated._carryForwardBalance   = carryForward;
         updated._newMonthGross         = newMonthGross;
@@ -189,18 +203,35 @@ export default function BillingInt() {
         updated.paymentdate      = null;
         updated.paymentmethod    = "";
         updated.paymentreference = "";
+        updated.bankname         = "";
         return updated;
       }
 
-      const gross    = parseFloat(field === "gross"    ? value : updated.gross)    || 0;
-      const discount = parseFloat(field === "discount" ? value : updated.discount) || 0;
-      const payment  = parseFloat(field === "paymentamount" ? value : updated.paymentamount) || 0;
-      const carry    = updated._carryForwardBalance || 0;
+      // Recalculate net whenever gross, discount, or servicefee changes
+      if (field === "gross" || field === "discount" || field === "servicefee") {
+        updated.net = recalcNet(
+          field === "gross"       ? value : updated.gross,
+          field === "discount"    ? value : updated.discount,
+          field === "servicefee"  ? value : updated.servicefee,
+          updated._carryForwardBalance
+        );
+      }
 
-      updated.net = (gross - discount + carry).toFixed(2);
+      const gross      = parseFloat(field === "gross"       ? value : updated.gross)       || 0;
+      const discount   = parseFloat(field === "discount"    ? value : updated.discount)    || 0;
+      const servicefee = parseFloat(field === "servicefee"  ? value : updated.servicefee)  || 0;
+      const payment    = parseFloat(field === "paymentamount" ? value : updated.paymentamount) || 0;
+      const carry      = updated._carryForwardBalance || 0;
 
-      if (field === "paymentamount" || field === "gross" || field === "discount") {
-        const net = gross - discount + carry;
+      updated.net = (gross - discount + servicefee + carry).toFixed(2);
+
+      if (
+        field === "paymentamount" ||
+        field === "gross" ||
+        field === "discount" ||
+        field === "servicefee"
+      ) {
+        const net = gross - discount + servicefee + carry;
         if (payment <= 0)        updated.paymentstatus = "Unpaid";
         else if (payment >= net) updated.paymentstatus = "Paid";
         else                     updated.paymentstatus = "Partial";
@@ -223,11 +254,13 @@ export default function BillingInt() {
       clientid: row.ClientID || "",
       gross: row.Gross || "",
       discount: row.Discount || "",
+      servicefee: row.ServiceFee || "0.00",
       net: row.Net || "",
       paymentamount: row.PaymentAmount || "",
       paymentdate: row.PaymentDate ? dayjs(row.PaymentDate) : null,
       paymentmethod: row.PaymentMethod || "",
       paymentreference: row.PaymentReference || "",
+      bankname: row.BankName || "",
       paymentstatus: row.PaymentStatus || "Unpaid",
       _carryForwardBalance: carryForward,
       _newMonthGross: parseFloat(row.Gross || 0),
@@ -249,7 +282,6 @@ export default function BillingInt() {
     return "Active";
   };
 
-  // ── FIX: resolve logged-in username from JWT payload ──────────
   const currentUser = accessToken?.userName || accessToken?.Fname || "system";
 
   const handleSubmit = async () => {
@@ -262,11 +294,13 @@ export default function BillingInt() {
       clientid: form.clientid,
       gross: parseFloat(form.gross) || 0,
       discount: parseFloat(form.discount) || 0,
+      servicefee: parseFloat(form.servicefee) || 0,
       net: parseFloat(form.net) || 0,
       paymentamount: parseFloat(form.paymentamount) || 0,
       paymentdate: fmt(form.paymentdate),
       paymentmethod: form.paymentmethod,
       paymentreference: form.paymentreference,
+      bankname: form.bankname,
       paymentstatus: form.paymentstatus,
     };
     try {
@@ -292,14 +326,10 @@ export default function BillingInt() {
               discount:        txn.Discount,
               nettotal:        txn.NetTotal,
               status:          txnStatus,
-              preparedby:      txn.PreparedBy || currentUser, // ← preserve existing or use current user
+              preparedby:      txn.PreparedBy || currentUser,
             })
           )
         );
-
-        // ── Also backfill PreparedBy on tbltransactionhdr rows that are NULL ──
-        // This runs posttransactionhdr is not involved here, but updatetransactionhdr
-        // now carries preparedby so future saves will populate it correctly.
 
         toast.success(
           `Billing saved. ${clientTxns.length} transaction(s) marked as "${txnStatus}".`
@@ -398,6 +428,7 @@ export default function BillingInt() {
       <p><strong>Payment Date:</strong> ${fmtD(row.PaymentDate)}</p>
       <p><strong>Payment Method:</strong> ${row.PaymentMethod || "—"}</p>
       <p><strong>Reference #:</strong> ${row.PaymentReference || "—"}</p>
+      <p><strong>Bank Name:</strong> ${row.BankName || "—"}</p>
       <p><strong>Status:</strong> ${row.PaymentStatus || "—"}</p>
     </div>
   </div>
@@ -419,11 +450,12 @@ export default function BillingInt() {
   </table>
   <hr/>
   <div class="totals">
-    <p>Gross Total: ₱ ${fmtM(row.Gross)}</p>
-    <p>Discount: &nbsp;&nbsp;&nbsp;₱ ${fmtM(row.Discount)}</p>
-    <p class="bold">Net Total: &nbsp;₱ ${fmtM(row.Net)}</p>
-    <p class="green">Amount Paid: ₱ ${fmtM(row.PaymentAmount)}</p>
-    <p class="${balance > 0 ? "red" : "green"}">Balance: &nbsp;&nbsp;&nbsp;&nbsp;₱ ${fmtM(balance)}</p>
+    <p>Gross Total: &nbsp;&nbsp;&nbsp;&nbsp;₱ ${fmtM(row.Gross)}</p>
+    <p>Discount: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;₱ ${fmtM(row.Discount)}</p>
+    <p>Service Fee: &nbsp;&nbsp;&nbsp;&nbsp;₱ ${fmtM(row.ServiceFee)}</p>
+    <p class="bold">Net Total: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;₱ ${fmtM(row.Net)}</p>
+    <p class="green">Amount Paid: &nbsp;&nbsp;₱ ${fmtM(row.PaymentAmount)}</p>
+    <p class="${balance > 0 ? "red" : "green"}">Balance: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;₱ ${fmtM(balance)}</p>
   </div>
   <div class="footer">Printed on ${dayjs().format("MMMM D, YYYY h:mm A")}</div>
   <script>
@@ -498,7 +530,11 @@ export default function BillingInt() {
   };
 
   const carryForward = form._carryForwardBalance || 0;
-  const newMonthNet  = parseFloat(form.net || 0) - carryForward;
+  const newMonthNet  = parseFloat(form.net || 0) - carryForward - (parseFloat(form.servicefee || 0));
+
+  // Show BankName field only when method is Check or Bank Transfer
+  const showBankName =
+    form.paymentmethod === "Check" || form.paymentmethod === "Bank Transfer";
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -507,11 +543,12 @@ export default function BillingInt() {
         {/* ── Summary Cards ── */}
         <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
           {[
-            { label: "Total Billing Records", value: totalRecords,                    mono: false, color: "primary.main" },
-            { label: "Grand Gross",           value: `₱ ${fmtMoney(grandGross)}`,    mono: true,  color: "text.primary"  },
-            { label: "Grand Discount",        value: `₱ ${fmtMoney(grandDiscount)}`, mono: true,  color: "error.main"    },
-            { label: "Grand Net",             value: `₱ ${fmtMoney(grandNet)}`,      mono: true,  color: "text.primary"  },
-            { label: "Total Payments",        value: `₱ ${fmtMoney(grandPaid)}`,     mono: true,  color: "success.main"  },
+            { label: "Total Billing Records", value: totalRecords,                         mono: false, color: "primary.main" },
+            { label: "Grand Gross",           value: `₱ ${fmtMoney(grandGross)}`,         mono: true,  color: "text.primary"  },
+            { label: "Grand Discount",        value: `₱ ${fmtMoney(grandDiscount)}`,      mono: true,  color: "error.main"    },
+            { label: "Grand Service Fee",     value: `₱ ${fmtMoney(grandServiceFee)}`,    mono: true,  color: "info.main"     },
+            { label: "Grand Net",             value: `₱ ${fmtMoney(grandNet)}`,           mono: true,  color: "text.primary"  },
+            { label: "Total Payments",        value: `₱ ${fmtMoney(grandPaid)}`,          mono: true,  color: "success.main"  },
           ].map((card) => (
             <Paper
               key={card.label}
@@ -646,6 +683,7 @@ export default function BillingInt() {
                   <TableCell sx={headerSx}>Retention</TableCell>
                   <TableCell sx={headerSx} align="right">Gross (₱)</TableCell>
                   <TableCell sx={headerSx} align="right">Discount (₱)</TableCell>
+                  <TableCell sx={headerSx} align="right">Service Fee (₱)</TableCell>
                   <TableCell sx={headerSx} align="right">Net (₱)</TableCell>
                   <TableCell sx={headerSx} align="right">Paid (₱)</TableCell>
                   <TableCell sx={headerSx} align="right">Balance (₱)</TableCell>
@@ -658,7 +696,7 @@ export default function BillingInt() {
               <TableBody>
                 {paginatedList.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={14} align="center" sx={{ py: 4, color: "text.secondary" }}>
+                    <TableCell colSpan={15} align="center" sx={{ py: 4, color: "text.secondary" }}>
                       {searchQuery ? "No results match your search." : "No billing records found."}
                     </TableCell>
                   </TableRow>
@@ -708,6 +746,11 @@ export default function BillingInt() {
                           <TableCell sx={cellSx} align="right">
                             <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.8rem", color: "error.main" }}>
                               ₱ {fmtMoney(row.Discount)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={cellSx} align="right">
+                            <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.8rem", color: "info.main" }}>
+                              ₱ {fmtMoney(row.ServiceFee)}
                             </Typography>
                           </TableCell>
                           <TableCell sx={cellSx} align="right">
@@ -770,7 +813,7 @@ export default function BillingInt() {
 
                         {/* ── Expanded transaction breakdown ── */}
                         <TableRow>
-                          <TableCell colSpan={14} sx={{ p: 0, borderBottom: isExpanded ? "1px solid" : "none", borderColor: "divider" }}>
+                          <TableCell colSpan={15} sx={{ p: 0, borderBottom: isExpanded ? "1px solid" : "none", borderColor: "divider" }}>
                             <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                               <Box sx={{ px: 5, py: 1.5, backgroundColor: "action.hover" }}>
                                 <Typography
@@ -841,7 +884,7 @@ export default function BillingInt() {
                                 </Table>
 
                                 <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.5 }}>
-                                  <Paper elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, p: 1.5, minWidth: 220 }}>
+                                  <Paper elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, p: 1.5, minWidth: 240 }}>
                                     <Typography variant="caption" fontWeight="bold" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
                                       Payment Summary
                                     </Typography>
@@ -853,11 +896,23 @@ export default function BillingInt() {
                                       <Typography variant="caption" color="text.secondary">Reference #</Typography>
                                       <Typography variant="caption" fontWeight="bold">{row.PaymentReference || "—"}</Typography>
                                     </Box>
+                                    {row.BankName && (
+                                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                                        <Typography variant="caption" color="text.secondary">Bank Name</Typography>
+                                        <Typography variant="caption" fontWeight="bold">{row.BankName}</Typography>
+                                      </Box>
+                                    )}
                                     <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                                       <Typography variant="caption" color="text.secondary">Date Paid</Typography>
                                       <Typography variant="caption" fontWeight="bold">{fmtDate(row.PaymentDate)}</Typography>
                                     </Box>
                                     <Divider sx={{ my: 0.8 }} />
+                                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                                      <Typography variant="caption" color="text.secondary">Service Fee</Typography>
+                                      <Typography variant="caption" fontWeight="bold" sx={{ color: "info.main", fontFamily: "monospace" }}>
+                                        ₱ {fmtMoney(row.ServiceFee)}
+                                      </Typography>
+                                    </Box>
                                     <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                                       <Typography variant="caption" color="text.secondary">Amount Paid</Typography>
                                       <Typography variant="caption" fontWeight="bold" sx={{ color: "success.main", fontFamily: "monospace" }}>
@@ -1004,6 +1059,7 @@ export default function BillingInt() {
                 </Grid>
               )}
 
+              {/* ── Gross / Discount / Service Fee / Net ── */}
               <Grid item xs={12} sm={6}>
                 <TextField
                   label="Gross (₱)"
@@ -1038,6 +1094,28 @@ export default function BillingInt() {
                 />
               </Grid>
 
+              {/* Service Fee — editable, added to net */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Service Fee (₱)"
+                  fullWidth
+                  size="small"
+                  type="number"
+                  inputProps={{ min: 0, step: "0.01" }}
+                  value={form.servicefee}
+                  onChange={(e) => handleChange("servicefee", e.target.value)}
+                  helperText="Added to net total"
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      "& fieldset": { borderColor: "info.main" },
+                      "&:hover fieldset": { borderColor: "info.main" },
+                      "&.Mui-focused fieldset": { borderColor: "info.main" },
+                    },
+                    "& .MuiInputLabel-root.Mui-focused": { color: "info.main" },
+                  }}
+                />
+              </Grid>
+
               <Grid item xs={12} sm={6}>
                 <TextField
                   label="Net (₱)"
@@ -1053,7 +1131,7 @@ export default function BillingInt() {
                       ? `Includes ₱${fmtMoney(carryForward)} prior balance`
                       : form._isMonthly && !isEdit
                       ? `This month's transactions only (${form._currentMonthTxnCount || 0} txn${(form._currentMonthTxnCount || 0) !== 1 ? "s" : ""})`
-                      : "Gross minus Discount"
+                      : "Gross − Discount + Service Fee"
                   }
                 />
               </Grid>
@@ -1118,7 +1196,21 @@ export default function BillingInt() {
                 />
               </Grid>
 
-              <Grid item xs={12} sm={6}>
+              {/* Bank Name — only shown for Check / Bank Transfer */}
+              {showBankName && (
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Bank Name"
+                    fullWidth
+                    size="small"
+                    placeholder="e.g. BDO, BPI, Metrobank"
+                    value={form.bankname}
+                    onChange={(e) => handleChange("bankname", e.target.value)}
+                  />
+                </Grid>
+              )}
+
+              <Grid item xs={12} sm={showBankName ? 6 : 6}>
                 <TextField
                   label="Payment Status"
                   select

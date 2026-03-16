@@ -29,7 +29,7 @@ import { AuthContext } from "../../modules/context/AuthContext";
 
 const emptyHdr = {
   id: "", transactiondate: null, clientid: "", particulars: "",
-  grosstotal: 0, discount: 0, nettotal: 0, status: "Active",
+  grosstotal: 0, discount: 0, servicefee: 0, nettotal: 0, status: "Active",
 };
 const emptyDtl = {
   id: "", serviceid: "", servicename: "", rate: "", qty: 1,
@@ -74,41 +74,24 @@ const normalizeDtl = (r) => ({
 });
 
 // ─── Searchable Select ────────────────────────────────────────────────────────
-// Renders a MUI TextField[select] with a sticky search box as first item
-function SearchableSelect({ label, value, onChange, options, size = "small", fullWidth = true, children, ...rest }) {
+function SearchableSelect({ label, value, onChange, options, size = "small", fullWidth = true, ...rest }) {
   const [search, setSearch] = React.useState("");
-
   const handleClose = () => setSearch("");
-
   const filtered = options.filter((o) =>
     o.label.toLowerCase().includes(search.toLowerCase())
   );
-
   return (
     <TextField
-      label={label}
-      select
-      fullWidth={fullWidth}
-      size={size}
-      value={value}
-      onChange={onChange}
+      label={label} select fullWidth={fullWidth} size={size} value={value} onChange={onChange}
       SelectProps={{
         onClose: handleClose,
-        MenuProps: {
-          autoFocus: false,
-          PaperProps: { sx: { maxHeight: 320 } },
-        },
+        MenuProps: { autoFocus: false, PaperProps: { sx: { maxHeight: 320 } } },
       }}
       {...rest}
     >
-      {/* Sticky search input inside the dropdown */}
       <ListSubheader sx={{ p: 0, lineHeight: "normal", backgroundColor: "background.paper" }}>
         <TextField
-          size="small"
-          autoFocus
-          placeholder="Search…"
-          fullWidth
-          value={search}
+          size="small" autoFocus placeholder="Search…" fullWidth value={search}
           onChange={(e) => { e.stopPropagation(); setSearch(e.target.value); }}
           onKeyDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
@@ -125,14 +108,11 @@ function SearchableSelect({ label, value, onChange, options, size = "small", ful
           sx={{ px: 1, pt: 1, pb: 0.5 }}
         />
       </ListSubheader>
-
       {filtered.length === 0 ? (
         <MenuItem disabled sx={{ fontSize: "0.8rem", color: "text.disabled" }}>No results found</MenuItem>
       ) : (
         filtered.map((o) => (
-          <MenuItem key={o.value} value={o.value} sx={{ fontSize: "0.85rem" }}>
-            {o.label}
-          </MenuItem>
+          <MenuItem key={o.value} value={o.value} sx={{ fontSize: "0.85rem" }}>{o.label}</MenuItem>
         ))
       )}
     </TextField>
@@ -181,7 +161,7 @@ export default function TransactionInt() {
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const [clientForm, setClientForm]             = useState(emptyClientForm);
 
-  // Dropdown options for SearchableSelect
+  // Dropdown options
   const clientOptions = clientList.map((c) => ({
     value: c.ClientID,
     label: c.TradeName || c.LNF || c.ClientID,
@@ -204,13 +184,30 @@ export default function TransactionInt() {
   const hasFilters = searchQuery || statusFilter !== "All";
   const paginatedList = filteredList.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
-  // Transaction HDR helpers
-  const hdrChange = (f, v) => setHdrForm((p) => ({ ...p, [f]: v }));
+  // ── HDR helpers ───────────────────────────────────────────────
+  const hdrChange = (f, v) => {
+    setHdrForm((p) => {
+      const updated = { ...p, [f]: v };
+      // Recompute net when gross, discount, or servicefee changes
+      if (f === "grosstotal" || f === "discount" || f === "servicefee") {
+        const g  = parseFloat(f === "grosstotal" ? v : updated.grosstotal) || 0;
+        const d  = parseFloat(f === "discount"   ? v : updated.discount)   || 0;
+        const sf = parseFloat(f === "servicefee" ? v : updated.servicefee) || 0;
+        updated.nettotal = g - d + sf;
+      }
+      return updated;
+    });
+  };
+
+  // Recompute HDR totals from DTL rows then add current servicefee
   const computeHdrTotals = (rows) => {
     const gross    = rows.reduce((s, r) => s + parseFloat(pick(r, "gross", "Gross")       || 0), 0);
     const discount = rows.reduce((s, r) => s + parseFloat(pick(r, "discount", "Discount") || 0), 0);
-    const net      = rows.reduce((s, r) => s + parseFloat(pick(r, "net", "Net")           || 0), 0);
-    setHdrForm((p) => ({ ...p, grosstotal: gross, discount, nettotal: net }));
+    const dtlNet   = rows.reduce((s, r) => s + parseFloat(pick(r, "net", "Net")           || 0), 0);
+    setHdrForm((p) => {
+      const sf = parseFloat(p.servicefee) || 0;
+      return { ...p, grosstotal: gross, discount, nettotal: dtlNet + sf };
+    });
   };
 
   const handleOpen = () => {
@@ -219,10 +216,15 @@ export default function TransactionInt() {
   };
   const handleEdit = async (row) => {
     setHdrForm({
-      id: row.ID, transactiondate: row.TransactionDate ? dayjs(row.TransactionDate) : null,
-      clientid: row.ClientID || "", particulars: row.Particulars || "",
-      grosstotal: row.GrossTotal || 0, discount: row.Discount || 0,
-      nettotal: row.NetTotal || 0, status: row.Status || "Active",
+      id: row.ID,
+      transactiondate: row.TransactionDate ? dayjs(row.TransactionDate) : null,
+      clientid: row.ClientID || "",
+      particulars: row.Particulars || "",
+      grosstotal: row.GrossTotal || 0,
+      discount: row.Discount || 0,
+      servicefee: row.ServiceFee || 0,
+      nettotal: row.NetTotal || 0,
+      status: row.Status || "Active",
     });
     try {
       const res = await http.get(`/selecttransactiondtlbyhdr?hdrid=${row.ID}`);
@@ -238,6 +240,7 @@ export default function TransactionInt() {
     const payload = {
       ...hdrForm,
       transactiondate: hdrForm.transactiondate ? dayjs(hdrForm.transactiondate).format("YYYY-MM-DD") : null,
+      servicefee: parseFloat(hdrForm.servicefee) || 0,
     };
     try {
       let hdrId = hdrForm.id;
@@ -274,7 +277,7 @@ export default function TransactionInt() {
     } catch { toast.error("Failed to delete."); }
   };
 
-  // DTL helpers
+  // ── DTL helpers ───────────────────────────────────────────────
   const dtlChange = (f, v) => {
     setDtlForm((p) => {
       const updated = { ...p, [f]: v };
@@ -301,14 +304,14 @@ export default function TransactionInt() {
     }
     setDtlForm(emptyDtl); setDtlEdit(false);
   };
-  const editDtlRow = (row) => { setDtlForm(row); setDtlEdit(true); };
+  const editDtlRow  = (row) => { setDtlForm(row); setDtlEdit(true); };
   const removeDtlRow = async (row) => {
     if (row.ID && !row._new) { try { await http.delete(`/deletetransactiondtl?id=${row.ID}`); } catch { /**/ } }
     const updated = dtlRows.filter((r) => r._key !== row._key);
     setDtlRows(updated); computeHdrTotals(updated);
   };
 
-  // Add Client helpers
+  // ── Add Client helpers ────────────────────────────────────────
   const handleClientDialogOpen  = () => { setClientForm(emptyClientForm); setClientDialogOpen(true); };
   const handleClientDialogClose = () => { setClientDialogOpen(false); setClientForm(emptyClientForm); };
   const handleClientChange = (field, value) => setClientForm((prev) => ({ ...prev, [field]: value }));
@@ -331,7 +334,7 @@ export default function TransactionInt() {
     } catch { toast.error("Failed to save client."); }
   };
 
-  // Receipt helpers
+  // ── Receipt helpers ───────────────────────────────────────────
   const fetchDtlForHdr = async (hdrId) => {
     try {
       const res = await http.get(`/selecttransactiondtlbyhdr?hdrid=${hdrId}`);
@@ -351,10 +354,11 @@ export default function TransactionInt() {
     setReceiptGroups(await Promise.all(clientHdrs.map(async (hdr) => ({ hdr, dtls: await fetchDtlForHdr(hdr.ID) }))));
   };
 
-  const combinedGross    = receiptGroups.reduce((s, g) => s + parseFloat(g.hdr.GrossTotal || 0), 0);
-  const combinedDiscount = receiptGroups.reduce((s, g) => s + parseFloat(g.hdr.Discount   || 0), 0);
-  const combinedNet      = receiptGroups.reduce((s, g) => s + parseFloat(g.hdr.NetTotal   || 0), 0);
-  const unpaidClientCount = (clientId) =>
+  const combinedGross      = receiptGroups.reduce((s, g) => s + parseFloat(g.hdr.GrossTotal || 0), 0);
+  const combinedDiscount   = receiptGroups.reduce((s, g) => s + parseFloat(g.hdr.Discount   || 0), 0);
+  const combinedServiceFee = receiptGroups.reduce((s, g) => s + parseFloat(g.hdr.ServiceFee || 0), 0);
+  const combinedNet        = receiptGroups.reduce((s, g) => s + parseFloat(g.hdr.NetTotal   || 0), 0);
+  const unpaidClientCount  = (clientId) =>
     hdrList.filter((h) => String(h.ClientID) === String(clientId) && h.Status !== "Paid").length;
 
   const handlePrint = () => {
@@ -369,12 +373,12 @@ export default function TransactionInt() {
   };
 
   // Style helpers
-  const cellSx = { fontSize: "0.82rem", whiteSpace: "nowrap", px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" };
-  const headerSx = { fontWeight: "bold", fontSize: "0.78rem", whiteSpace: "nowrap", px: 1.5, py: 1.2, backgroundColor: "action.hover", color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "2px solid", borderColor: "divider" };
+  const cellSx     = { fontSize: "0.82rem", whiteSpace: "nowrap", px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" };
+  const headerSx   = { fontWeight: "bold", fontSize: "0.78rem", whiteSpace: "nowrap", px: 1.5, py: 1.2, backgroundColor: "action.hover", color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "2px solid", borderColor: "divider" };
   const dtlCellSx   = { ...cellSx, py: 0.6 };
   const dtlHeaderSx = { ...headerSx, py: 1 };
 
-  const clientName = (id) => {
+  const clientName  = (id) => {
     const c = clientList.find((x) => String(x.ClientID) === String(id));
     return c ? c.TradeName || c.LNF || id : id;
   };
@@ -479,14 +483,14 @@ export default function TransactionInt() {
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
-                  {["#", "Date", "Client", "Particulars", "Gross", "Discount", "Net", "Status", "Actions"].map((h) => (
+                  {["#", "Date", "Client", "Particulars", "Gross", "Discount", "Service Fee", "Net", "Status", "Actions"].map((h) => (
                     <TableCell key={h} sx={headerSx}>{h}</TableCell>
                   ))}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {paginatedList.length === 0 ? (
-                  <TableRow><TableCell colSpan={9} align="center" sx={{ py: 4, color: "text.secondary" }}>{hasFilters ? "No results match your filters." : "No transaction records found."}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={10} align="center" sx={{ py: 4, color: "text.secondary" }}>{hasFilters ? "No results match your filters." : "No transaction records found."}</TableCell></TableRow>
                 ) : paginatedList.map((row, index) => {
                   const unpaidCount = unpaidClientCount(row.ClientID);
                   return (
@@ -506,10 +510,22 @@ export default function TransactionInt() {
                       <TableCell sx={cellSx} title={row.Particulars}>
                         <Box sx={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.Particulars || "—"}</Box>
                       </TableCell>
-                      <TableCell sx={cellSx} align="right"><Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace" }}>{fmtPHP(row.GrossTotal)}</Typography></TableCell>
-                      <TableCell sx={cellSx} align="right"><Typography variant="body2" sx={{ fontFamily: "monospace", color: "error.main" }}>{fmtPHP(row.Discount)}</Typography></TableCell>
-                      <TableCell sx={cellSx} align="right"><Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: "success.main" }}>{fmtPHP(row.NetTotal)}</Typography></TableCell>
-                      <TableCell sx={cellSx}><Chip label={row.Status || "—"} size="small" color={statusColor(row.Status)} sx={{ fontSize: "0.72rem" }} /></TableCell>
+                      <TableCell sx={cellSx} align="right">
+                        <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace" }}>{fmtPHP(row.GrossTotal)}</Typography>
+                      </TableCell>
+                      <TableCell sx={cellSx} align="right">
+                        <Typography variant="body2" sx={{ fontFamily: "monospace", color: "error.main" }}>{fmtPHP(row.Discount)}</Typography>
+                      </TableCell>
+                      {/* ── Service Fee column ── */}
+                      <TableCell sx={cellSx} align="right">
+                        <Typography variant="body2" sx={{ fontFamily: "monospace", color: "info.main" }}>{fmtPHP(row.ServiceFee)}</Typography>
+                      </TableCell>
+                      <TableCell sx={cellSx} align="right">
+                        <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: "success.main" }}>{fmtPHP(row.NetTotal)}</Typography>
+                      </TableCell>
+                      <TableCell sx={cellSx}>
+                        <Chip label={row.Status || "—"} size="small" color={statusColor(row.Status)} sx={{ fontSize: "0.72rem" }} />
+                      </TableCell>
                       <TableCell sx={cellSx} align="center">
                         <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
                           <Tooltip title="View Receipt"><IconButton size="small" color="primary" onClick={() => handleViewReceipt(row)}><ReceiptIcon fontSize="small" /></IconButton></Tooltip>
@@ -661,19 +677,14 @@ export default function TransactionInt() {
                 </Box>
               </Grid>
 
-              {/* Row 1: Date | Client (searchable) | Status */}
+              {/* Row 1: Date | Client | Status */}
               <Grid item xs={12} sm={4}>
                 <DatePicker label="Billing Date" value={hdrForm.transactiondate} onChange={(v) => hdrChange("transactiondate", v)}
                   slotProps={{ textField: { fullWidth: true, size: "small" } }} />
               </Grid>
               <Grid item xs={12} sm={4}>
-                {/* ── Searchable Client dropdown ── */}
-                <SearchableSelect
-                  label="Client"
-                  value={hdrForm.clientid}
-                  onChange={(e) => hdrChange("clientid", e.target.value)}
-                  options={clientOptions}
-                />
+                <SearchableSelect label="Client" value={hdrForm.clientid}
+                  onChange={(e) => hdrChange("clientid", e.target.value)} options={clientOptions} />
               </Grid>
               <Grid item xs={12} sm={4}>
                 <TextField label="Status" select fullWidth size="small" value={hdrForm.status} onChange={(e) => hdrChange("status", e.target.value)}>
@@ -691,6 +702,26 @@ export default function TransactionInt() {
               <Grid item xs={12}>
                 <TextField label="Particulars / Explanation" fullWidth size="small" multiline rows={2}
                   value={hdrForm.particulars} onChange={(e) => hdrChange("particulars", e.target.value)} />
+              </Grid>
+
+              {/* ── Service Fee ── */}
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label="Service Fee (₱)"
+                  fullWidth size="small" type="number"
+                  inputProps={{ min: 0, step: "0.01" }}
+                  value={hdrForm.servicefee}
+                  onChange={(e) => hdrChange("servicefee", e.target.value)}
+                  helperText="Added on top of line-item net total"
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      "& fieldset": { borderColor: "info.main" },
+                      "&:hover fieldset": { borderColor: "info.main" },
+                      "&.Mui-focused fieldset": { borderColor: "info.main" },
+                    },
+                    "& .MuiInputLabel-root.Mui-focused": { color: "info.main" },
+                  }}
+                />
               </Grid>
 
               <Grid item xs={12}>
@@ -716,13 +747,8 @@ export default function TransactionInt() {
                   <Box sx={{ p: 2 }}>
                     <Grid container spacing={1.5} alignItems="flex-end">
                       <Grid item xs={12} sm={3}>
-                        {/* ── Searchable Service dropdown ── */}
-                        <SearchableSelect
-                          label="Service"
-                          value={dtlForm.serviceid}
-                          onChange={(e) => dtlChange("serviceid", e.target.value)}
-                          options={serviceOptions}
-                        />
+                        <SearchableSelect label="Service" value={dtlForm.serviceid}
+                          onChange={(e) => dtlChange("serviceid", e.target.value)} options={serviceOptions} />
                       </Grid>
                       <Grid item xs={12} sm={3}><TextField label="Service Name" fullWidth size="small" value={dtlForm.servicename} onChange={(e) => dtlChange("servicename", e.target.value)} /></Grid>
                       <Grid item xs={6} sm={1.5}><TextField label="Rate (₱)" fullWidth size="small" type="number" value={dtlForm.rate} onChange={(e) => dtlChange("rate", e.target.value)} /></Grid>
@@ -765,7 +791,7 @@ export default function TransactionInt() {
                         ))}
                         {dtlRows.length > 0 && (
                           <TableRow sx={{ backgroundColor: darkMode ? alpha("#fff", 0.04) : alpha("#000", 0.03) }}>
-                            <TableCell colSpan={5} sx={{ ...dtlCellSx, fontWeight: "bold", fontSize: "0.78rem" }}>TOTALS</TableCell>
+                            <TableCell colSpan={5} sx={{ ...dtlCellSx, fontWeight: "bold", fontSize: "0.78rem" }}>SUBTOTALS</TableCell>
                             <TableCell sx={dtlCellSx} align="right"><Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace" }}>{fmtPHP(hdrForm.grosstotal)}</Typography></TableCell>
                             <TableCell sx={dtlCellSx} align="right"><Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace", color: "error.main" }}>{fmtPHP(hdrForm.discount)}</Typography></TableCell>
                             <TableCell sx={dtlCellSx} align="right"><Typography variant="caption" fontWeight="bold" sx={{ fontFamily: "monospace", color: "success.main" }}>{fmtPHP(hdrForm.nettotal)}</Typography></TableCell>
@@ -778,10 +804,11 @@ export default function TransactionInt() {
                 </Paper>
               </Grid>
 
+              {/* ── Billing Summary ── */}
               <Grid item xs={12}>
                 <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
                   <Paper elevation={0} sx={{
-                    border: "1px solid", borderColor: "divider", borderRadius: 2, p: 2, minWidth: 300,
+                    border: "1px solid", borderColor: "divider", borderRadius: 2, p: 2, minWidth: 320,
                     backgroundColor: darkMode ? alpha("#fff", 0.03) : alpha(theme.palette.primary.main, 0.02),
                   }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
@@ -792,13 +819,18 @@ export default function TransactionInt() {
                     </Box>
                     {[
                       { label: "Gross Total", value: hdrForm.grosstotal, color: "text.primary" },
-                      { label: "Discount",    value: hdrForm.discount,   color: "error.main" },
+                      { label: "Discount",    value: hdrForm.discount,   color: "error.main"   },
                     ].map(({ label, value, color }) => (
                       <Box key={label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: 0.4 }}>
                         <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem" }}>{label}</Typography>
                         <Typography variant="body2" sx={{ fontFamily: "monospace", color, fontSize: "0.8rem" }}>{fmtPHP(value)}</Typography>
                       </Box>
                     ))}
+                    {/* Service Fee line in summary */}
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: 0.4 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem" }}>Service Fee</Typography>
+                      <Typography variant="body2" sx={{ fontFamily: "monospace", color: "info.main", fontSize: "0.8rem" }}>{fmtPHP(hdrForm.servicefee)}</Typography>
+                    </Box>
                     <Divider sx={{ my: 1 }} />
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center",
                       backgroundColor: darkMode ? alpha(theme.palette.success.main, 0.12) : alpha(theme.palette.success.main, 0.07),
@@ -857,7 +889,12 @@ export default function TransactionInt() {
                   </Box>
                   <Divider sx={{ mb: 2 }} />
                   <Grid container spacing={1.5} sx={{ mb: 2 }}>
-                    {[{ label: "Transaction ID", value: `#${receiptData.ID}` }, { label: "Date", value: fmtDate(receiptData.TransactionDate) }, { label: "Client", value: clientName(receiptData.ClientID) }, { label: "Status", value: receiptData.Status }].map(({ label, value }) => (
+                    {[
+                      { label: "Transaction ID", value: `#${receiptData.ID}` },
+                      { label: "Date",           value: fmtDate(receiptData.TransactionDate) },
+                      { label: "Client",         value: clientName(receiptData.ClientID) },
+                      { label: "Status",         value: receiptData.Status },
+                    ].map(({ label, value }) => (
                       <Grid item xs={6} key={label}>
                         <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: "0.05em" }}>{label}</Typography>
                         <Typography variant="body2" fontWeight={600}>{label === "Status" ? <Chip label={value} size="small" color={statusColor(value)} sx={{ fontSize: "0.7rem" }} /> : value}</Typography>
@@ -873,14 +910,22 @@ export default function TransactionInt() {
                   <ReceiptDtlTable dtls={receiptDtls} />
                   <Box sx={{ mt: 2, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5 }}>
                     <Divider sx={{ width: "100%", mb: 1 }} />
-                    {[{ label: "Gross Total", value: receiptData.GrossTotal, color: "text.primary" }, { label: "Discount", value: receiptData.Discount, color: "error.main" }].map(({ label, value, color }) => (
-                      <Box key={label} sx={{ display: "flex", justifyContent: "space-between", width: 260 }}>
+                    {[
+                      { label: "Gross Total", value: receiptData.GrossTotal, color: "text.primary" },
+                      { label: "Discount",    value: receiptData.Discount,   color: "error.main"   },
+                    ].map(({ label, value, color }) => (
+                      <Box key={label} sx={{ display: "flex", justifyContent: "space-between", width: 280 }}>
                         <Typography variant="body2" color="text.secondary">{label}</Typography>
                         <Typography variant="body2" sx={{ fontFamily: "monospace", color }}>{fmtPHP(value)}</Typography>
                       </Box>
                     ))}
-                    <Divider sx={{ width: 260, my: 0.5 }} />
-                    <Box sx={{ display: "flex", justifyContent: "space-between", width: 260 }}>
+                    {/* Service Fee in single receipt */}
+                    <Box sx={{ display: "flex", justifyContent: "space-between", width: 280 }}>
+                      <Typography variant="body2" color="text.secondary">Service Fee</Typography>
+                      <Typography variant="body2" sx={{ fontFamily: "monospace", color: "info.main" }}>{fmtPHP(receiptData.ServiceFee)}</Typography>
+                    </Box>
+                    <Divider sx={{ width: 280, my: 0.5 }} />
+                    <Box sx={{ display: "flex", justifyContent: "space-between", width: 280 }}>
                       <Typography variant="subtitle2" fontWeight="bold">NET TOTAL</Typography>
                       <Typography variant="subtitle2" fontWeight="bold" sx={{ fontFamily: "monospace", color: "success.main" }}>{fmtPHP(receiptData.NetTotal)}</Typography>
                     </Box>
@@ -914,6 +959,7 @@ export default function TransactionInt() {
                       <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 0.5, gap: 3, flexWrap: "wrap", pr: 1 }}>
                         <Typography variant="caption" color="text.secondary">Gross: <strong style={{ fontFamily: "monospace" }}>{fmtPHP(group.hdr.GrossTotal)}</strong></Typography>
                         <Typography variant="caption" color="error.main">Discount: <strong style={{ fontFamily: "monospace" }}>{fmtPHP(group.hdr.Discount)}</strong></Typography>
+                        <Typography variant="caption" sx={{ color: "info.main" }}>Service Fee: <strong style={{ fontFamily: "monospace" }}>{fmtPHP(group.hdr.ServiceFee)}</strong></Typography>
                         <Typography variant="caption" color="success.main">Net: <strong style={{ fontFamily: "monospace" }}>{fmtPHP(group.hdr.NetTotal)}</strong></Typography>
                       </Box>
                       {gi < receiptGroups.length - 1 && <Divider sx={{ mt: 2 }} />}
@@ -925,7 +971,11 @@ export default function TransactionInt() {
                       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5, backgroundColor: darkMode ? alpha("#fff", 0.04) : alpha("#1a3a5c", 0.05), borderRadius: 2, p: 2 }}>
                         <Typography component="span" variant="subtitle2" fontWeight="bold" sx={{ color: "text.secondary", alignSelf: "flex-start" }}>GRAND TOTAL — {receiptClient?.name}</Typography>
                         <Divider sx={{ width: "100%", my: 0.5 }} />
-                        {[{ label: "Total Gross", value: combinedGross, color: "text.primary" }, { label: "Total Discount", value: combinedDiscount, color: "error.main" }].map(({ label, value, color }) => (
+                        {[
+                          { label: "Total Gross",       value: combinedGross,      color: "text.primary" },
+                          { label: "Total Discount",    value: combinedDiscount,   color: "error.main"   },
+                          { label: "Total Service Fee", value: combinedServiceFee, color: "info.main"    },
+                        ].map(({ label, value, color }) => (
                           <Box key={label} sx={{ display: "flex", justifyContent: "space-between", width: 300 }}>
                             <Typography variant="body2" color="text.secondary">{label}</Typography>
                             <Typography variant="body2" sx={{ fontFamily: "monospace", color }}>{fmtPHP(value)}</Typography>

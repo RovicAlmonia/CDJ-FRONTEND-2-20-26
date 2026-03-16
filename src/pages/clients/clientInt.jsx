@@ -44,22 +44,24 @@ const emptyForm = {
 };
 
 const DATE_FIELD_OPTIONS = [
-  { value: "DateRegistered",      label: "Date Registered" },
-  { value: "DateExpiration",      label: "Date Expiration" },
-  { value: "DTIExpirationDate",   label: "DTI Expiration" },
-  { value: "SECExpirationDate",   label: "SEC Expiration" },
+  { value: "DateRegistered",         label: "Date Registered" },
+  { value: "DateExpiration",         label: "Date Expiration" },
+  { value: "DTIExpirationDate",      label: "DTI Expiration" },
+  { value: "SECExpirationDate",      label: "SEC Expiration" },
   { value: "TaxClearanceExpiration", label: "Tax Clearance Expiration" },
-  { value: "PhilGEPSExpiration",  label: "PhilGEPS Expiration" },
+  { value: "PhilGEPSExpiration",     label: "PhilGEPS Expiration" },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDisplay = (val) => (val ? dayjs(val).format("MMM D, YYYY") : "—");
 
-// DB enum on tbltransactionHDR.Status: 'Active' | 'Posted' | 'Paid'
+const fmtMoney = (val) =>
+  "₱" + Number(val || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+
 const statusColor = (s) => {
-  if (s === "Paid")    return "success";   // green  — fully paid
-  if (s === "Posted")  return "warning";   // orange — partially paid
-  if (s === "Active")  return "primary";   // blue   — not yet paid
+  if (s === "Paid")   return "success";
+  if (s === "Posted") return "warning";
+  if (s === "Active") return "primary";
   return "default";
 };
 
@@ -96,11 +98,9 @@ function AddPaymentDialog({ open, onClose, onSave, billingId, netTotal, alreadyP
 
   const net       = parseFloat(netTotal    || 0);
   const paid      = parseFloat(alreadyPaid || 0);
-  // Remaining balance = what the client still owes after prior payments
   const remaining = Math.max(0, net - paid);
   const isAddMore = paid > 0 && net > 0;
 
-  // partial: entered amount < remaining balance → "Posted"; clears balance → "Paid"
   const willBePosted  = rawAmt > 0 && remaining > 0 && rawAmt < remaining;
   const paymentStatus = willBePosted ? "Posted" : "Paid";
   const txnStatus     = paymentStatus;
@@ -123,14 +123,9 @@ function AddPaymentDialog({ open, onClose, onSave, billingId, netTotal, alreadyP
 
     try {
       await http.post("/postpayment", payload);
-
-      // ── KEY FIX: update tbltransactionHDR.Status after payment ──
-      // billingId here = TransactionHDRID
-      // "Posted" = partial payment made; "Paid" = fully paid
       if (billingId) {
         await http.post("/updatetransactionstatus", { id: billingId, status: txnStatus }).catch(() => {});
       }
-
       toast.success(`Payment saved as ${paymentStatus}!`);
       onSave();
       onClose();
@@ -145,30 +140,25 @@ function AddPaymentDialog({ open, onClose, onSave, billingId, netTotal, alreadyP
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
           <PaymentIcon fontSize="small" sx={{ color: "primary.main" }} />
           <Typography variant="subtitle1" fontWeight="bold">Add Payment</Typography>
-          {billingId && <Chip label={`Transaction #${billingId}`} size="small" variant="outlined" sx={{ fontSize: "0.7rem" }} />}
+          {billingId  && <Chip label={`Transaction #${billingId}`} size="small" variant="outlined" sx={{ fontSize: "0.7rem" }} />}
           {clientName && <Chip label={clientName} size="small" color="primary" variant="outlined" sx={{ fontSize: "0.7rem" }} />}
         </Box>
         <IconButton size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
       </DialogTitle>
 
       <DialogContent sx={{ pt: 2.5, pb: 1 }}>
-        {/* Balance reference bar */}
         {net > 0 && (
           <Box sx={{ mb: 2, p: 1.5, borderRadius: 1.5, backgroundColor: "action.hover" }}>
             {isAddMore && (
               <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                 <Typography variant="caption" color="text.secondary">Net Total</Typography>
-                <Typography variant="caption" fontWeight={600}>
-                  ₱{net.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                </Typography>
+                <Typography variant="caption" fontWeight={600}>{fmtMoney(net)}</Typography>
               </Box>
             )}
             {isAddMore && (
               <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                 <Typography variant="caption" color="text.secondary">Already Paid</Typography>
-                <Typography variant="caption" fontWeight={600} sx={{ color: "success.main" }}>
-                  − ₱{paid.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                </Typography>
+                <Typography variant="caption" fontWeight={600} sx={{ color: "success.main" }}>− {fmtMoney(paid)}</Typography>
               </Box>
             )}
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: isAddMore ? "1px solid" : "none", borderColor: "divider", pt: isAddMore ? 0.5 : 0 }}>
@@ -176,16 +166,15 @@ function AddPaymentDialog({ open, onClose, onSave, billingId, netTotal, alreadyP
                 {isAddMore ? "Remaining Balance" : "Net Total to Pay"}
               </Typography>
               <Typography variant="subtitle2" fontWeight="bold" color={isAddMore ? "warning.main" : "success.main"}>
-                ₱{remaining.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                {fmtMoney(remaining)}
               </Typography>
             </Box>
           </Box>
         )}
-        {/* Posted warning */}
         {willBePosted && (
           <Box sx={{ mb: 2, p: 1.5, borderRadius: 1.5, backgroundColor: alpha("#ed6c02", 0.10), border: "1px solid", borderColor: "warning.main" }}>
             <Typography variant="caption" sx={{ color: "warning.main", fontWeight: 600 }}>
-              ⚠ ₱{rawAmt.toLocaleString("en-PH", { minimumFractionDigits: 2 })} entered is less than the remaining balance ₱{remaining.toLocaleString("en-PH", { minimumFractionDigits: 2 })} — status will be <strong>Posted</strong>
+              ⚠ {fmtMoney(rawAmt)} entered is less than the remaining balance {fmtMoney(remaining)} — status will be <strong>Posted</strong>
             </Typography>
           </Box>
         )}
@@ -200,7 +189,6 @@ function AddPaymentDialog({ open, onClose, onSave, billingId, netTotal, alreadyP
             </TextField>
           </Grid>
 
-          {/* Cash — no reference number */}
           {method === "Cash" && <>
             <Grid item xs={12} sm={6}>
               <TextField label="Amount" fullWidth size="small" type="number" value={form.amount} onChange={e => f("amount", e.target.value)}
@@ -211,7 +199,6 @@ function AddPaymentDialog({ open, onClose, onSave, billingId, netTotal, alreadyP
             </Grid>
           </>}
 
-          {/* GCash / Maya — with reference number, no bank */}
           {(method === "GCash" || method === "Maya") && <>
             <Grid item xs={12} sm={6}>
               <TextField label="Reference Number" fullWidth size="small" value={form.refNo} onChange={e => f("refNo", e.target.value)} />
@@ -225,7 +212,6 @@ function AddPaymentDialog({ open, onClose, onSave, billingId, netTotal, alreadyP
             </Grid>
           </>}
 
-          {/* Check — with bank name */}
           {method === "Check" && <>
             <Grid item xs={12} sm={6}>
               <TextField label="Bank Name" fullWidth size="small" value={form.bankName} onChange={e => f("bankName", e.target.value)} />
@@ -242,7 +228,6 @@ function AddPaymentDialog({ open, onClose, onSave, billingId, netTotal, alreadyP
             </Grid>
           </>}
 
-          {/* Bank Transfer — with bank name */}
           {method === "Bank Transfer" && <>
             <Grid item xs={12} sm={6}>
               <TextField label="Bank Name" fullWidth size="small" value={form.bankName} onChange={e => f("bankName", e.target.value)} />
@@ -302,16 +287,11 @@ function ServiceDateRow({ row, onAddPayment, theme, retentionType }) {
         </TableCell>
         <TableCell sx={{ ...cellSx, fontWeight: 600, color: "success.main" }}>
           {(row.Total ?? row.NetTotal) != null
-            ? `₱${Number(row.Total ?? row.NetTotal).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
+            ? fmtMoney(row.Total ?? row.NetTotal)
             : "—"}
         </TableCell>
         <TableCell sx={cellSx}>
-          <Chip
-            label={row.Status || "—"}
-            size="small"
-            color={statusColor(row.Status)}
-            sx={{ fontSize: "0.7rem" }}
-          />
+          <Chip label={row.Status || "—"} size="small" color={statusColor(row.Status)} sx={{ fontSize: "0.7rem" }} />
         </TableCell>
         <TableCell sx={cellSx}>{row.PreparedBy || "—"}</TableCell>
         <TableCell sx={cellSx} align="center" onClick={e => e.stopPropagation()}>
@@ -344,7 +324,7 @@ function ServiceDateRow({ row, onAddPayment, theme, retentionType }) {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    {["Billing ID", "Particulars", "Gross Total", "Discount", "Net Total", "Status"].map(h => (
+                    {["Billing ID", "Particulars", "Gross Total", "Discount", "Service Fee", "Net Total", "Status"].map(h => (
                       <TableCell key={h} sx={{ fontSize: "0.72rem", fontWeight: "bold", color: "text.secondary", py: 0.5, px: 1, textTransform: "uppercase" }}>{h}</TableCell>
                     ))}
                   </TableRow>
@@ -353,14 +333,12 @@ function ServiceDateRow({ row, onAddPayment, theme, retentionType }) {
                   <TableRow>
                     <TableCell sx={{ fontSize: "0.78rem", py: 0.5, px: 1 }}>{row.BillingID ?? row.IDTransaction ?? "—"}</TableCell>
                     <TableCell sx={{ fontSize: "0.78rem", py: 0.5, px: 1 }}>{row.Particulars || "—"}</TableCell>
-                    <TableCell sx={{ fontSize: "0.78rem", py: 0.5, px: 1 }}>
-                      ₱{Number(row.GrossTotal || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell sx={{ fontSize: "0.78rem", py: 0.5, px: 1 }}>
-                      ₱{Number(row.Discount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                    </TableCell>
+                    <TableCell sx={{ fontSize: "0.78rem", py: 0.5, px: 1 }}>{fmtMoney(row.GrossTotal)}</TableCell>
+                    <TableCell sx={{ fontSize: "0.78rem", py: 0.5, px: 1, color: "error.main" }}>{fmtMoney(row.Discount)}</TableCell>
+                    {/* ── Service Fee cell ── */}
+                    <TableCell sx={{ fontSize: "0.78rem", py: 0.5, px: 1, color: "info.main" }}>{fmtMoney(row.ServiceFee)}</TableCell>
                     <TableCell sx={{ fontSize: "0.78rem", py: 0.5, px: 1, fontWeight: 600, color: "success.main" }}>
-                      ₱{Number(row.Total ?? row.NetTotal ?? 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                      {fmtMoney(row.Total ?? row.NetTotal)}
                     </TableCell>
                     <TableCell sx={{ fontSize: "0.78rem", py: 0.5, px: 1 }}>
                       <Chip label={row.Status || "—"} size="small" color={statusColor(row.Status)} sx={{ fontSize: "0.68rem" }} />
@@ -369,7 +347,7 @@ function ServiceDateRow({ row, onAddPayment, theme, retentionType }) {
                   {details.length > 0 && (
                     <>
                       <TableRow>
-                        <TableCell colSpan={6} sx={{ fontSize: "0.70rem", fontWeight: "bold", color: "text.disabled", pt: 1, pb: 0.3, px: 1, textTransform: "uppercase" }}>
+                        <TableCell colSpan={7} sx={{ fontSize: "0.70rem", fontWeight: "bold", color: "text.disabled", pt: 1, pb: 0.3, px: 1, textTransform: "uppercase" }}>
                           Service Line Items
                         </TableCell>
                       </TableRow>
@@ -377,10 +355,12 @@ function ServiceDateRow({ row, onAddPayment, theme, retentionType }) {
                         <TableRow key={di}>
                           <TableCell sx={{ fontSize: "0.75rem", py: 0.3, px: 1 }}>{d.ServiceID || "—"}</TableCell>
                           <TableCell sx={{ fontSize: "0.75rem", py: 0.3, px: 1 }}>{d.ServiceName || "—"}</TableCell>
-                          <TableCell sx={{ fontSize: "0.75rem", py: 0.3, px: 1 }}>₱{Number(d.Gross || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</TableCell>
-                          <TableCell sx={{ fontSize: "0.75rem", py: 0.3, px: 1 }}>₱{Number(d.Discount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</TableCell>
-                          <TableCell sx={{ fontSize: "0.75rem", py: 0.3, px: 1, fontWeight: 600, color: "success.main" }}>₱{Number(d.Amount || d.Net || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</TableCell>
-                          <TableCell sx={{ fontSize: "0.75rem", py: 0.3, px: 1 }}>Qty: {d.QTY || 1} · Rate: ₱{Number(d.Rate || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell sx={{ fontSize: "0.75rem", py: 0.3, px: 1 }}>{fmtMoney(d.Gross)}</TableCell>
+                          <TableCell sx={{ fontSize: "0.75rem", py: 0.3, px: 1, color: "error.main" }}>{fmtMoney(d.Discount)}</TableCell>
+                          {/* Line items don't have their own ServiceFee — show em dash */}
+                          <TableCell sx={{ fontSize: "0.75rem", py: 0.3, px: 1, color: "text.disabled" }}>—</TableCell>
+                          <TableCell sx={{ fontSize: "0.75rem", py: 0.3, px: 1, fontWeight: 600, color: "success.main" }}>{fmtMoney(d.Amount ?? d.Net)}</TableCell>
+                          <TableCell sx={{ fontSize: "0.75rem", py: 0.3, px: 1 }}>Qty: {d.QTY || 1} · Rate: {fmtMoney(d.Rate)}</TableCell>
                         </TableRow>
                       ))}
                     </>
@@ -390,51 +370,38 @@ function ServiceDateRow({ row, onAddPayment, theme, retentionType }) {
 
               {/* Balance summary + Next Billing */}
               {(() => {
-                const net       = Number(row.Total ?? row.NetTotal ?? 0);
-                const isPaid    = row.Status === "Paid";
-                // If fully paid, balance is always 0 regardless of TotalPaid data
-                const paid      = isPaid ? net : Number(row.TotalPaid ?? 0);
-                const balance   = isPaid ? 0 : Math.max(0, net - paid);
+                const net     = Number(row.Total ?? row.NetTotal ?? 0);
+                const isPaid  = row.Status === "Paid";
+                const paid    = isPaid ? net : Number(row.TotalPaid ?? 0);
+                const balance = isPaid ? 0 : Math.max(0, net - paid);
 
-                // Next billing: use ServiceRenewalMonths from details, or fall back to RetentionType
                 const renewalMonths = (() => {
                   const srm = details[0]?.ServiceRenewalMonths;
                   if (srm) return Number(srm);
-                  // Fall back to client retention type
                   const rt = row.RetentionType || retentionType || "";
                   if (rt === "Monthly")     return 1;
                   if (rt === "Quarterly")   return 3;
                   if (rt === "Semi Annual") return 6;
                   if (rt === "Annual")      return 12;
-                  return 1; // default to monthly if nothing found
+                  return 1;
                 })();
-                const txnDate = row.TransactionDate || row.Date;
-                const nextBilling = (renewalMonths && txnDate)
-                  ? dayjs(txnDate).add(renewalMonths, "month")
-                  : null;
-                const daysUntil = nextBilling ? nextBilling.diff(dayjs(), "day") : null;
-                const isOverdue  = daysUntil !== null && daysUntil < 0;
-                const isSoon     = daysUntil !== null && daysUntil >= 0 && daysUntil <= 30;
+                const txnDate    = row.TransactionDate || row.Date;
+                const nextBilling = (renewalMonths && txnDate) ? dayjs(txnDate).add(renewalMonths, "month") : null;
+                const daysUntil   = nextBilling ? nextBilling.diff(dayjs(), "day") : null;
+                const isOverdue   = daysUntil !== null && daysUntil < 0;
 
                 return (
                   <Box sx={{ mt: 1.5, pt: 1, borderTop: "1px solid", borderColor: "divider" }}>
-                    {/* Balance row */}
                     <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 3, mb: nextBilling ? 1 : 0 }}>
                       <Typography variant="caption" color="text.secondary">
                         Amount Paid:&nbsp;
-                        <strong style={{ color: "#2e7d32" }}>
-                          ₱{paid.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                        </strong>
+                        <strong style={{ color: "#2e7d32" }}>{fmtMoney(paid)}</strong>
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         Balance:&nbsp;
-                        <strong style={{ color: balance > 0 ? "#c62828" : "#2e7d32" }}>
-                          ₱{balance.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                        </strong>
+                        <strong style={{ color: balance > 0 ? "#c62828" : "#2e7d32" }}>{fmtMoney(balance)}</strong>
                       </Typography>
                     </Box>
-
-                    {/* Next billing reminder */}
                     {nextBilling && (
                       <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
                         <Typography variant="caption" color="text.secondary">
@@ -496,21 +463,21 @@ function TransactionLedgerDialog({ open, onClose, clientId, clientName, theme })
             Total Transactions: <strong>{transactions.length}</strong>
           </Typography>
           <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            Total Amount: <strong style={{ color: theme.palette.success.main }}>₱{totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</strong>
+            Total Amount: <strong style={{ color: theme.palette.success.main }}>{fmtMoney(totalAmount)}</strong>
           </Typography>
         </Box>
         <TableContainer>
           <Table stickyHeader size="small">
             <TableHead>
               <TableRow>
-                {["#", "Billing ID", "Date", "Client ID", "Particulars", "Gross", "Discount", "Net Total", "Status"].map(h => (
+                {["#", "Billing ID", "Date", "Client ID", "Particulars", "Gross", "Discount", "Service Fee", "Net Total", "Status"].map(h => (
                   <TableCell key={h} sx={headerSx}>{h}</TableCell>
                 ))}
               </TableRow>
             </TableHead>
             <TableBody>
               {transactions.length === 0 ? (
-                <TableRow><TableCell colSpan={9} align="center" sx={{ py: 4, color: "text.secondary" }}>No transactions found.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} align="center" sx={{ py: 4, color: "text.secondary" }}>No transactions found.</TableCell></TableRow>
               ) : transactions.map((t, i) => (
                 <TableRow key={i} hover sx={{ backgroundColor: i % 2 === 0 ? "transparent" : "action.hover" }}>
                   <TableCell sx={{ ...cellSx, color: "text.disabled", fontSize: "0.72rem", width: 40 }}>{i + 1}</TableCell>
@@ -518,9 +485,11 @@ function TransactionLedgerDialog({ open, onClose, clientId, clientName, theme })
                   <TableCell sx={cellSx}>{t.Date ? dayjs(t.Date).format("MMM D, YYYY") : "—"}</TableCell>
                   <TableCell sx={cellSx}>{t.ClientID || "—"}</TableCell>
                   <TableCell sx={{ ...cellSx, maxWidth: 280 }}>{t.Particulars || "—"}</TableCell>
-                  <TableCell sx={cellSx}>₱{Number(t.GrossTotal || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</TableCell>
-                  <TableCell sx={cellSx}>₱{Number(t.Discount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</TableCell>
-                  <TableCell sx={{ ...cellSx, fontWeight: 600, color: "success.main" }}>₱{Number(t.Total ?? t.NetTotal ?? 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</TableCell>
+                  <TableCell sx={cellSx}>{fmtMoney(t.GrossTotal)}</TableCell>
+                  <TableCell sx={{ ...cellSx, color: "error.main" }}>{fmtMoney(t.Discount)}</TableCell>
+                  {/* ── Service Fee column ── */}
+                  <TableCell sx={{ ...cellSx, color: "info.main" }}>{fmtMoney(t.ServiceFee)}</TableCell>
+                  <TableCell sx={{ ...cellSx, fontWeight: 600, color: "success.main" }}>{fmtMoney(t.Total ?? t.NetTotal)}</TableCell>
                   <TableCell sx={cellSx}>
                     <Chip label={t.Status || "—"} size="small" color={statusColor(t.Status)} sx={{ fontSize: "0.7rem" }} />
                   </TableCell>
@@ -572,21 +541,21 @@ function PaymentLedgerDialog({ open, onClose, clientId, clientName, theme }) {
             Total Payments: <strong>{payments.length}</strong>
           </Typography>
           <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            Total Paid: <strong style={{ color: theme.palette.success.main }}>₱{totalPaid.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</strong>
+            Total Paid: <strong style={{ color: theme.palette.success.main }}>{fmtMoney(totalPaid)}</strong>
           </Typography>
         </Box>
         <TableContainer>
           <Table stickyHeader size="small">
             <TableHead>
               <TableRow>
-                {["#", "Client ID", "Method", "Payment Date", "Reference No.", "Gross", "Discount", "Net", "Amount Paid", "Status"].map(h => (
+                {["#", "Client ID", "Method", "Payment Date", "Reference No.", "Gross", "Discount", "Service Fee", "Net", "Amount Paid", "Status"].map(h => (
                   <TableCell key={h} sx={headerSx}>{h}</TableCell>
                 ))}
               </TableRow>
             </TableHead>
             <TableBody>
               {payments.length === 0 ? (
-                <TableRow><TableCell colSpan={10} align="center" sx={{ py: 4, color: "text.secondary" }}>No payments recorded yet.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={11} align="center" sx={{ py: 4, color: "text.secondary" }}>No payments recorded yet.</TableCell></TableRow>
               ) : payments.map((p, i) => (
                 <TableRow key={i} hover sx={{ backgroundColor: i % 2 === 0 ? "transparent" : "action.hover" }}>
                   <TableCell sx={{ ...cellSx, color: "text.disabled", fontSize: "0.72rem", width: 40 }}>{i + 1}</TableCell>
@@ -596,11 +565,13 @@ function PaymentLedgerDialog({ open, onClose, clientId, clientName, theme }) {
                   </TableCell>
                   <TableCell sx={cellSx}>{p.Date || p.PaymentDate ? dayjs(p.Date || p.PaymentDate).format("MMM D, YYYY") : "—"}</TableCell>
                   <TableCell sx={cellSx}>{p.ReferenceNumber || p.PaymentReference || "—"}</TableCell>
-                  <TableCell sx={cellSx}>₱{Number(p.Gross || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</TableCell>
-                  <TableCell sx={cellSx}>₱{Number(p.Discount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</TableCell>
-                  <TableCell sx={cellSx}>₱{Number(p.Net || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</TableCell>
+                  <TableCell sx={cellSx}>{fmtMoney(p.Gross)}</TableCell>
+                  <TableCell sx={{ ...cellSx, color: "error.main" }}>{fmtMoney(p.Discount)}</TableCell>
+                  {/* ── Service Fee column ── */}
+                  <TableCell sx={{ ...cellSx, color: "info.main" }}>{fmtMoney(p.ServiceFee)}</TableCell>
+                  <TableCell sx={cellSx}>{fmtMoney(p.Net)}</TableCell>
                   <TableCell sx={{ ...cellSx, fontWeight: 600, color: "success.main" }}>
-                    ₱{Number(p.Amount || p.PaymentAmount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                    {fmtMoney(p.Amount ?? p.PaymentAmount)}
                   </TableCell>
                   <TableCell sx={cellSx}>
                     <Chip label={p.Status || p.PaymentStatus || "—"} size="small"
@@ -676,22 +647,22 @@ function ClientInfoDialog({ open, onClose, client, accessToken, theme }) {
       });
 
   const infoItems = [
-    { label: "Client ID",          value: client.ClientID },
-    { label: "Type",               value: client.Type },
-    { label: "Date Registered",    value: fmtDisplay(client.DateRegistered) },
-    { label: "Date Expiration",    value: fmtDisplay(client.DateExpiration) },
-    { label: "DTI Cert No.",       value: client.DTICertificationNo },
-    { label: "DTI Expiration",     value: fmtDisplay(client.DTIExpirationDate) },
-    { label: "SEC ID No.",         value: client.SECIDNo },
-    { label: "SEC Expiration",     value: fmtDisplay(client.SECExpirationDate) },
-    { label: "CDA Cert No.",       value: client.CDACertNo },
-    { label: "EFPS Account",       value: client.EFPSAccount },
-    { label: "Tax Clearance No.",  value: client.TaxClearanceCertNo },
-    { label: "Tax Clearance Exp.", value: fmtDisplay(client.TaxClearanceExpiration) },
-    { label: "PhilGEPS",           value: client.PhilGEPS },
-    { label: "PhilGEPS Cert No.",  value: client.PhilGEPSCertNo },
-    { label: "PhilGEPS Expiration",value: fmtDisplay(client.PhilGEPSExpiration) },
-    { label: "Retention Type",     value: client.RetentionType },
+    { label: "Client ID",           value: client.ClientID },
+    { label: "Type",                value: client.Type },
+    { label: "Date Registered",     value: fmtDisplay(client.DateRegistered) },
+    { label: "Date Expiration",     value: fmtDisplay(client.DateExpiration) },
+    { label: "DTI Cert No.",        value: client.DTICertificationNo },
+    { label: "DTI Expiration",      value: fmtDisplay(client.DTIExpirationDate) },
+    { label: "SEC ID No.",          value: client.SECIDNo },
+    { label: "SEC Expiration",      value: fmtDisplay(client.SECExpirationDate) },
+    { label: "CDA Cert No.",        value: client.CDACertNo },
+    { label: "EFPS Account",        value: client.EFPSAccount },
+    { label: "Tax Clearance No.",   value: client.TaxClearanceCertNo },
+    { label: "Tax Clearance Exp.",  value: fmtDisplay(client.TaxClearanceExpiration) },
+    { label: "PhilGEPS",            value: client.PhilGEPS },
+    { label: "PhilGEPS Cert No.",   value: client.PhilGEPSCertNo },
+    { label: "PhilGEPS Expiration", value: fmtDisplay(client.PhilGEPSExpiration) },
+    { label: "Retention Type",      value: client.RetentionType },
   ];
 
   return (
@@ -895,8 +866,8 @@ export default function ClientInt() {
       (row.PhilGEPSCertNo || "").toLowerCase().includes(query) ||
       (row.Status || "").toLowerCase().includes(query);
     const rowDate = row[dateField] ? dayjs(row[dateField]) : null;
-    const matchesFrom = !dateFrom || (rowDate && rowDate.isAfter(dayjs(dateFrom).subtract(1, "day")));
-    const matchesTo   = !dateTo   || (rowDate && rowDate.isBefore(dayjs(dateTo).add(1, "day")));
+    const matchesFrom   = !dateFrom || (rowDate && rowDate.isAfter(dayjs(dateFrom).subtract(1, "day")));
+    const matchesTo     = !dateTo   || (rowDate && rowDate.isBefore(dayjs(dateTo).add(1, "day")));
     const matchesStatus = statusFilter === "All" || (row.Status || "") === statusFilter;
     return matchesSearch && matchesFrom && matchesTo && matchesStatus;
   });
@@ -1019,7 +990,6 @@ export default function ClientInt() {
               <Typography variant="caption" sx={{ color: "text.secondary" }}>Active filters:</Typography>
               {searchQuery && <Chip label={`Search: "${searchQuery}"`} size="small" onDelete={() => { setSearchQuery(""); setPage(0); }} sx={{ fontSize: "0.7rem", height: 20 }} />}
               {statusFilter !== "All" && <Chip label={`Status: ${statusFilter}`} size="small" color={statusFilter === "Active" ? "success" : "error"} onDelete={() => { setStatusFilter("All"); setPage(0); }} sx={{ fontSize: "0.7rem", height: 20 }} />}
-              
               <Typography variant="caption" sx={{ color: "text.secondary", ml: 0.5 }}>— {filteredList.length} result{filteredList.length !== 1 ? "s" : ""} found</Typography>
             </Box>
           )}
