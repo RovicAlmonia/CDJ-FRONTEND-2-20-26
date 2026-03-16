@@ -50,18 +50,12 @@ const periodLabel = (hdr) => {
 const deriveStatus = (deadlineDate, isFiled) => {
   if (isFiled) return "Filed";
   const dl = daysLeft(deadlineDate);
-<<<<<<< HEAD
   return dl < 0 ? "Overdue" : dl <= 7 ? "Incomplete" : "Upcoming";
 };
 
 // Remap backend "Pending" → "Incomplete" so the API value never leaks into UI state
 const normalizeStatus = (s) => (s === "Pending" ? "Incomplete" : s);
 
-=======
-  return dl < 0 ? "Overdue" : dl <= 7 ? "Pending" : "Upcoming";
-};
-
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
 // ─────────────────────────────────────────────────────────────
 // THEME-AWARE STATUS COLORS
 // ─────────────────────────────────────────────────────────────
@@ -82,11 +76,7 @@ const useStatusColors = () => {
       border: dark ? "rgba(248,113,113,0.25)" : "#FCA5A5",
       chip:   dark ? "rgba(248,113,113,0.14)" : "#FEE2E2",
     },
-<<<<<<< HEAD
     Incomplete: {
-=======
-    Pending: {
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
       color:  dark ? "#FCD34D" : "#D97706",
       bg:     dark ? "rgba(252,211,77,0.08)"  : "#FFFBEB",
       border: dark ? "rgba(252,211,77,0.25)"  : "#FCD34D",
@@ -140,11 +130,7 @@ function StatusBadge({ status, size = "small" }) {
   const icon = {
     Complete:      <CheckCircleIcon sx={{ fontSize: fs }} />,
     Overdue:       <ErrorIcon sx={{ fontSize: fs }} />,
-<<<<<<< HEAD
     Incomplete:    <WarningAmberIcon sx={{ fontSize: fs }} />,
-=======
-    Pending:       <WarningAmberIcon sx={{ fontSize: fs }} />,
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
     Upcoming:      <ErrorIcon sx={{ fontSize: fs }} />,
     "To Be Filed": <ErrorIcon sx={{ fontSize: fs }} />,
     Filed:         <CheckCircleIcon sx={{ fontSize: fs }} />,
@@ -181,36 +167,21 @@ function NotificationBell({ monitors }) {
       .map((d) => ({ ...d, dl: daysLeft(d.DeadlineDate), monitor: m }))
   ).sort((a, b) => a.dl - b.dl);
 
-<<<<<<< HEAD
   const overdueCount    = notifs.filter((n) => n.dl < 0).length;
   const incompleteColor = S.Incomplete.color;
   const incompleteBg    = S.Incomplete.bg;
-=======
-  const overdueCount = notifs.filter((n) => n.dl < 0).length;
-  const pendingColor = S.Pending.color;
-  const pendingBg    = S.Pending.bg;
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
 
   return (
     <>
       <Tooltip title="Deadline Alerts">
         <IconButton size="small" onClick={(e) => setAnchor(e.currentTarget)} sx={{
           width: 38, height: 38, border: "1px solid",
-<<<<<<< HEAD
           borderColor: notifs.length > 0 ? incompleteColor : "divider",
           bgcolor: notifs.length > 0 ? incompleteBg : "background.paper",
         }}>
           <Badge badgeContent={notifs.length} color={overdueCount > 0 ? "error" : "warning"}
             sx={{ "& .MuiBadge-badge": { fontSize: "0.58rem", minWidth: 15, height: 15 } }}>
             <NotificationsIcon fontSize="small" sx={{ color: notifs.length > 0 ? incompleteColor : "text.secondary" }} />
-=======
-          borderColor: notifs.length > 0 ? pendingColor : "divider",
-          bgcolor: notifs.length > 0 ? pendingBg : "background.paper",
-        }}>
-          <Badge badgeContent={notifs.length} color={overdueCount > 0 ? "error" : "warning"}
-            sx={{ "& .MuiBadge-badge": { fontSize: "0.58rem", minWidth: 15, height: 15 } }}>
-            <NotificationsIcon fontSize="small" sx={{ color: notifs.length > 0 ? pendingColor : "text.secondary" }} />
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
           </Badge>
         </IconButton>
       </Tooltip>
@@ -225,27 +196,16 @@ function NotificationBell({ monitors }) {
         }}}>
         <Box sx={{
           px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1,
-<<<<<<< HEAD
           bgcolor: notifs.length > 0 ? incompleteBg : "background.default",
           borderBottom: "1px solid", borderColor: "divider",
         }}>
           <NotificationsIcon fontSize="small" sx={{ color: incompleteColor }} />
-=======
-          bgcolor: notifs.length > 0 ? pendingBg : "background.default",
-          borderBottom: "1px solid", borderColor: "divider",
-        }}>
-          <NotificationsIcon fontSize="small" sx={{ color: pendingColor }} />
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
           <Typography fontWeight={700} fontSize="0.9rem">Deadline Alerts</Typography>
           {overdueCount > 0 && <Chip label={`${overdueCount} overdue`} size="small" color="error"
             sx={{ ml: 0.5, fontWeight: 700, fontSize: "0.62rem", height: 18 }} />}
           <Chip label={notifs.length} size="small"
             sx={{ ml: "auto", fontWeight: 700, fontSize: "0.62rem", height: 18,
-<<<<<<< HEAD
               bgcolor: S.Incomplete.chip, color: incompleteColor, border: `1px solid ${S.Incomplete.border}` }} />
-=======
-              bgcolor: S.Pending.chip, color: pendingColor, border: `1px solid ${S.Pending.border}` }} />
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
         </Box>
 
         <Box sx={{ overflowY: "auto", flex: 1 }}>
@@ -257,11 +217,7 @@ function NotificationBell({ monitors }) {
             </Box>
           ) : notifs.map((n) => {
             const isOv = n.dl < 0;
-<<<<<<< HEAD
             const t    = isOv ? S.Overdue : S.Incomplete;
-=======
-            const t    = isOv ? S.Overdue : S.Pending;
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
             return (
               <Box key={n.ID} sx={{
                 px: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider",
@@ -321,11 +277,7 @@ function EditDetailDialog({ open, detail, onClose, onSave }) {
   const dl   = daysLeft(detail.DeadlineDate);
   const isOv = dl < 0;
   const isCr = dl >= 0 && dl <= 3;
-<<<<<<< HEAD
   const tc   = isOv ? S.Overdue : isCr ? S.Incomplete : S.Complete;
-=======
-  const tc   = isOv ? S.Overdue : isCr ? S.Pending : S.Complete;
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
 
   const indigoBg     = dark ? "rgba(99,102,241,0.15)" : "#EEF2FF";
   const indigoBorder = dark ? "rgba(99,102,241,0.35)" : "#C7D2FE";
@@ -631,17 +583,10 @@ function DetailPanel({ monitor, onEditDetail }) {
   const dark        = palette.mode === "dark";
   const cats        = [...new Set((monitor.Details||[]).map((d) => d.Category))];
 
-<<<<<<< HEAD
   const panelBg     = dark ? palette.background.default : "#F8FAFF";
   const panelBorder = dark ? palette.divider : "#E8EDFF";
   const cardBg      = dark ? palette.background.paper : "#FFFFFF";
   const rowBorder   = dark ? palette.divider : "#E5E7EB";
-=======
-  const panelBg    = dark ? palette.background.default : "#F8FAFF";
-  const panelBorder = dark ? palette.divider : "#E8EDFF";
-  const cardBg     = dark ? palette.background.paper : "#FFFFFF";
-  const rowBorder  = dark ? palette.divider : "#E5E7EB";
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
 
   return (
     <Box sx={{ bgcolor: panelBg, borderTop: `2px solid ${panelBorder}`, p: 3 }}>
@@ -680,11 +625,7 @@ function DetailPanel({ monitor, onEditDetail }) {
         </Box>
 
         {monitor.Remarks && (
-<<<<<<< HEAD
           <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: S.Incomplete.bg, border: `1px solid ${S.Incomplete.border}`, maxWidth: 240 }}>
-=======
-          <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: S.Pending.bg, border: `1px solid ${S.Pending.border}`, maxWidth: 240 }}>
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
             <Typography variant="caption" color="text.secondary" display="block">Remarks</Typography>
             <Typography variant="caption" color="text.primary">{monitor.Remarks}</Typography>
           </Box>
@@ -955,15 +896,11 @@ export default function FilingTracker() {
       const raw = res?.data?.data ?? [];
       setMonitors(raw.map((m) => ({
         ...m,
-<<<<<<< HEAD
         OverallStatus: normalizeStatus(m.OverallStatus),
         Details: (m.Details||[]).map((d) => ({
           ...d,
           CurrentStatus: deriveStatus(d.DeadlineDate, d.IsFiled),
         })),
-=======
-        Details: (m.Details||[]).map((d) => ({ ...d, CurrentStatus: deriveStatus(d.DeadlineDate, d.IsFiled) })),
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
       })));
     } catch { showSnack("Failed to load monitors.", "error"); }
     finally { setLoading(false); }
@@ -1011,11 +948,7 @@ export default function FilingTracker() {
         const filed = nd.filter((d) => d.IsFiled).length;
         const ov    = nd.filter((d) => d.CurrentStatus==="Overdue").length;
         const pct   = nd.length ? Math.round((filed/nd.length)*100) : 0;
-<<<<<<< HEAD
         const st    = filed===nd.length&&nd.length>0?"Complete":ov>0?"Overdue":filed>0?"Incomplete":"Upcoming";
-=======
-        const st    = filed===nd.length&&nd.length>0?"Complete":ov>0?"Overdue":filed>0?"Pending":"Upcoming";
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
         return { ...m, Details: nd, FiledCount: filed, OverdueCount: ov, ProgressPct: pct, OverallStatus: st };
       }));
       showSnack("Updated locally — sync pending.");
@@ -1048,16 +981,10 @@ export default function FilingTracker() {
     );
   });
 
-<<<<<<< HEAD
   // ── Counter pills: Complete, Incomplete, Not Filed (Overdue), To Be Filled (Upcoming) ──
   const counts = {
     Complete:      monitors.filter((m) => m.OverallStatus === "Complete").length,
     Incomplete:    monitors.filter((m) => m.OverallStatus === "Incomplete").length,
-=======
-  // ── Counter pills: Complete, Not Filed (Overdue), To Be Filled (Upcoming) ──
-  const counts = {
-    Complete:      monitors.filter((m) => m.OverallStatus === "Complete").length,
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
     "Not Filed":   monitors.filter((m) => m.OverallStatus === "Overdue").length,
     "To Be Filed": monitors.filter((m) => m.OverallStatus === "Upcoming").length,
   };
@@ -1065,10 +992,7 @@ export default function FilingTracker() {
   // Map display label → actual OverallStatus value for filtering
   const labelToStatus = {
     Complete:      "Complete",
-<<<<<<< HEAD
     Incomplete:    "Incomplete",
-=======
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
     "Not Filed":   "Overdue",
     "To Be Filed": "Upcoming",
   };
@@ -1076,10 +1000,7 @@ export default function FilingTracker() {
   // Map display label → color palette key
   const labelToColor = {
     Complete:      "Complete",
-<<<<<<< HEAD
     Incomplete:    "Incomplete",
-=======
->>>>>>> 5c691c4ef26b3a96ddd4ea215a5e150f8f3626c4
     "Not Filed":   "Overdue",
     "To Be Filed": "Upcoming",
   };
