@@ -285,9 +285,28 @@ function ServiceDateRow({ row, onAddPayment, theme, retentionType }) {
         <TableCell sx={{ ...cellSx, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {row.Particulars || "—"}
         </TableCell>
+
+        {/* ── Total cell: show balance chip for Posted ── */}
         <TableCell sx={{ ...cellSx, fontWeight: 600, color: "success.main" }}>
           {(row.Total ?? row.NetTotal) != null ? fmtMoney(row.Total ?? row.NetTotal) : "—"}
+          {row.Status === "Posted" && (() => {
+            const net     = Number(row.Total ?? row.NetTotal ?? 0);
+            const paid    = Number(row.TotalPaid ?? 0);
+            const balance = Math.max(0, net - paid);
+            return (
+              <Box component="span" sx={{ display: "block", mt: 0.3 }}>
+                <Chip
+                  label={`Bal: ${fmtMoney(balance)}`}
+                  size="small"
+                  color="warning"
+                  variant="outlined"
+                  sx={{ fontSize: "0.65rem", height: 16, borderRadius: 1 }}
+                />
+              </Box>
+            );
+          })()}
         </TableCell>
+
         <TableCell sx={cellSx}>
           <Chip label={row.Status || "—"} size="small" color={statusColor(row.Status)} sx={{ fontSize: "0.7rem" }} />
         </TableCell>
