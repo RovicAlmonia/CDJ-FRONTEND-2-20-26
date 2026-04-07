@@ -121,7 +121,6 @@ function NotificationItem({ notification, darkMode, isLast }) {
         },
       }}
     >
-      {/* Urgency dot */}
       <Box
         sx={{
           width: 8,
@@ -167,9 +166,7 @@ function NotificationCategoryPanel({ category, items, darkMode }) {
   const [expanded, setExpanded] = useState(true);
   const cfg = NOTIFICATION_CATEGORIES[category];
   const bgColor = darkMode ? cfg.bgDark : cfg.bgLight;
-  const borderColor = darkMode
-    ? cfg.color + "44"
-    : cfg.borderColor;
+  const borderColor = darkMode ? cfg.color + "44" : cfg.borderColor;
 
   if (items.length === 0) return null;
 
@@ -182,7 +179,6 @@ function NotificationCategoryPanel({ category, items, darkMode }) {
         backgroundColor: bgColor,
       }}
     >
-      {/* Category Header */}
       <Box
         onClick={() => setExpanded((p) => !p)}
         sx={{
@@ -192,17 +188,11 @@ function NotificationCategoryPanel({ category, items, darkMode }) {
           px: 2,
           py: 1.25,
           cursor: "pointer",
-          borderBottom: expanded
-            ? `1px solid ${borderColor}`
-            : "none",
-          backgroundColor: darkMode
-            ? cfg.color + "22"
-            : cfg.color + "18",
+          borderBottom: expanded ? `1px solid ${borderColor}` : "none",
+          backgroundColor: darkMode ? cfg.color + "22" : cfg.color + "18",
           userSelect: "none",
           "&:hover": {
-            backgroundColor: darkMode
-              ? cfg.color + "33"
-              : cfg.color + "25",
+            backgroundColor: darkMode ? cfg.color + "33" : cfg.color + "25",
           },
         }}
       >
@@ -231,15 +221,10 @@ function NotificationCategoryPanel({ category, items, darkMode }) {
           />
         </Box>
         <Box sx={{ color: cfg.color, display: "flex", alignItems: "center" }}>
-          {expanded ? (
-            <ExpandLessIcon fontSize="small" />
-          ) : (
-            <ExpandMoreIcon fontSize="small" />
-          )}
+          {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
         </Box>
       </Box>
 
-      {/* Items */}
       <Collapse in={expanded}>
         <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 0 }}>
           {items.map((item, idx) => (
@@ -274,37 +259,23 @@ export default function Content() {
   const { data: OT } = hookContainer("/get-approval-ot");
   const { data: otherDeductions } = hookContainer("/get-approval-otherDeductions");
   const { data: loans } = hookContainer("/get-approval-loans");
-
   const { data: servicesAvailedRaw } = hookContainer("/selectservicesavailed");
   const { data: allClientsRaw } = hookContainer("/selectclientss");
 
   console.log("accessToken:", accessToken);
 
-  // Process data into lists
   const OTOffList = Array.isArray(OTOff)
     ? OTOff?.map((row) => ({ ...row, id: row.id, ottime: `${row.otTimeFrom} - ${row.otTimeTo}` }))
     : [];
-
-  const VLList = Array.isArray(VL)
-    ? VL?.map((row) => ({ ...row, id: row.id }))
-    : [];
-
-  const AbsentList = Array.isArray(AbsentData)
-    ? AbsentData?.map((row) => ({ ...row, id: row.id }))
-    : [];
-
-  const BackPayList = Array.isArray(backpay)
-    ? backpay?.map((row) => ({ ...row, id: row.did }))
-    : [];
-
+  const VLList = Array.isArray(VL) ? VL?.map((row) => ({ ...row, id: row.id })) : [];
+  const AbsentList = Array.isArray(AbsentData) ? AbsentData?.map((row) => ({ ...row, id: row.id })) : [];
+  const BackPayList = Array.isArray(backpay) ? backpay?.map((row) => ({ ...row, id: row.did })) : [];
   const OTList = Array.isArray(OT)
     ? OT?.map((row) => ({ ...row, id: row.OTid, time: `${row.OTTimeFrom} - ${row.OTTimeTo}` }))
     : [];
-
   const otherDeductionList = Array.isArray(otherDeductions)
     ? otherDeductions?.map((row) => ({ ...row, id: row.did }))
     : [];
-
   const loanList = Array.isArray(loans)
     ? loans?.map((row) => ({
         ...row,
@@ -313,15 +284,12 @@ export default function Content() {
       }))
     : [];
 
-  // State
   const [year, setYear] = useState(dayjs().year());
   const [selectedMonth, setSelectedMonth] = useState(dayjs());
   const [chartType, setChartType] = useState("pie");
 
   const { data: empHire } = hookContainer(`/get-empHire?Year=${year}`);
-  const empHireList = Array.isArray(empHire?.data)
-    ? empHire?.data?.map((row) => ({ ...row }))
-    : [];
+  const empHireList = Array.isArray(empHire?.data) ? empHire?.data?.map((row) => ({ ...row })) : [];
 
   const { data: WorkForceSummary } = hookContainer("/get-empCategory");
   const workforceList = Array.isArray(WorkForceSummary?.data)
@@ -331,12 +299,7 @@ export default function Content() {
   const { data: clientData } = hookContainer("/get-clients-summary");
 
   const [payPeriod, setPayPeriod] = useState({
-    PPID: "",
-    PFrom: "",
-    PTo: "",
-    Type: "",
-    Terms: "",
-    Status: "",
+    PPID: "", PFrom: "", PTo: "", Type: "", Terms: "", Status: "",
   });
 
   const { data: branchBasicSummary } = hookContainer(
@@ -356,20 +319,11 @@ export default function Content() {
     );
   }, [payPeriod]);
 
-  // Totals
   const totalPendingApprovals =
-    OTOffList.length +
-    VLList.length +
-    AbsentList.length +
-    BackPayList.length +
-    OTList.length +
-    otherDeductionList.length +
-    loanList.length;
+    OTOffList.length + VLList.length + AbsentList.length +
+    BackPayList.length + OTList.length + otherDeductionList.length + loanList.length;
 
-  const totalEmployees = workforceList.reduce(
-    (sum, item) => sum + (item.count || 0),
-    0
-  );
+  const totalEmployees = workforceList.reduce((sum, item) => sum + (item.count || 0), 0);
 
   const clientStats = {
     total: clientData?.data?.total || 0,
@@ -380,47 +334,55 @@ export default function Content() {
     coop: clientData?.data?.coop || 0,
   };
 
-  const activePercentage =
-    clientStats.total > 0
-      ? ((clientStats.active / clientStats.total) * 100).toFixed(1)
-      : "0.0";
-  const inactivePercentage =
-    clientStats.total > 0
-      ? ((clientStats.inactive / clientStats.total) * 100).toFixed(1)
-      : "0.0";
+  const activePercentage = clientStats.total > 0
+    ? ((clientStats.active / clientStats.total) * 100).toFixed(1)
+    : "0.0";
+  const inactivePercentage = clientStats.total > 0
+    ? ((clientStats.inactive / clientStats.total) * 100).toFixed(1)
+    : "0.0";
 
-  // Dark mode color palette
+  // ── Navy blue dark mode color palette ──────────────────────────
+  // Mirrors the app shell: page #111927, cards #161C24, sections #1C2536
   const colors = {
-    cardBg: darkMode ? "#1e1e1e" : "#ffffff",
-    cardBorder: darkMode ? "#333333" : "#ddd",
-    text: darkMode ? "#ffffff" : "#000000",
-    textSecondary: darkMode ? "#b0b0b0" : "#666666",
-    headerBg: darkMode ? "#252525" : "#ffffff",
-    headerBorder: darkMode ? "#333333" : "#000",
-    sectionBg: darkMode ? "#2a2a2a" : "#f5f5f5",
-    sectionBorder: darkMode ? "#404040" : "#ddd",
-    inputBg: darkMode ? "#1a1a1a" : "#e81e1e",
-    notificationBorder: darkMode ? "#404040" : "#e0e0e0",
+    // Cards sit one shade above the page canvas (#111927)
+    cardBg:     darkMode ? "#161C24" : "#ffffff",
+    cardBorder: darkMode ? "rgba(145,158,171,0.12)" : "#ddd",
+
+    text:          darkMode ? "#ffffff" : "#000000",
+    textSecondary: darkMode ? "#99A0AB" : "#666666",
+
+    // Header banner — slightly elevated from card bg
+    headerBg:     darkMode ? "#1C2536" : "#ffffff",
+    headerBorder: darkMode ? "rgba(145,158,171,0.12)" : "#000",
+
+    // Section panels — same as card bg, subtle distinction via border
+    sectionBg:     darkMode ? "#161C24" : "#f5f5f5",
+    sectionBorder: darkMode ? "rgba(145,158,171,0.12)" : "#ddd",
+
+    // Date picker input background
+    inputBg: darkMode ? "#111927" : "#e81e1e",
+
+    notificationBorder: darkMode ? "rgba(145,158,171,0.15)" : "#e0e0e0",
   };
 
   const chartColors = {
-    active: darkMode ? "#66bb6a" : "#4caf50",
+    active:  darkMode ? "#66bb6a" : "#4caf50",
     inactive: darkMode ? "#ef5350" : "#f44336",
-    primary: darkMode ? "#42a5f5" : "#1976d2",
-    purple: darkMode ? "#ab47bc" : "#9c27b0",
-    orange: darkMode ? "#ffa726" : "#ff9800",
-    gray: darkMode ? "#78909c" : "#607d8b",
+    primary:  darkMode ? "#42a5f5" : "#1976d2",
+    purple:   darkMode ? "#ab47bc" : "#9c27b0",
+    orange:   darkMode ? "#ffa726" : "#ff9800",
+    gray:     darkMode ? "#78909c" : "#607d8b",
   };
 
   const clientStatusData = [
-    { id: 0, value: clientStats.active, label: "Active Clients", color: chartColors.active },
+    { id: 0, value: clientStats.active,   label: "Active Clients",   color: chartColors.active },
     { id: 1, value: clientStats.inactive, label: "Inactive Clients", color: chartColors.inactive },
   ];
 
   const clientTypeData = [
     { id: 0, value: clientStats.soleProprietor, label: "Sole Proprietor", color: chartColors.primary },
-    { id: 1, value: clientStats.corporation, label: "Corporation", color: chartColors.purple },
-    { id: 2, value: clientStats.coop, label: "COOP", color: chartColors.orange },
+    { id: 1, value: clientStats.corporation,    label: "Corporation",      color: chartColors.purple },
+    { id: 2, value: clientStats.coop,           label: "COOP",             color: chartColors.orange },
   ];
 
   const handleRefreshData = () => {
@@ -431,11 +393,7 @@ export default function Content() {
   };
 
   const handleExportData = () => {
-    const exportData = {
-      date: dayjs().format("YYYY-MM-DD"),
-      clientStats,
-      categorizedNotifications,
-    };
+    const exportData = { date: dayjs().format("YYYY-MM-DD"), clientStats, categorizedNotifications };
     const dataStr = JSON.stringify(exportData, null, 2);
     const dataBlob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(dataBlob);
@@ -446,15 +404,11 @@ export default function Content() {
     URL.revokeObjectURL(url);
   };
 
-  const handleToggleChartType = () => {
-    setChartType((prev) => (prev === "pie" ? "bar" : "pie"));
-  };
+  const handleToggleChartType = () => setChartType((prev) => (prev === "pie" ? "bar" : "pie"));
 
-  // ── Build Notifications (Categorized) ───────────────────────────
-
+  // ── Build Notifications (Categorized) ──────────────────────────
   const today = dayjs();
 
-  // 1. Service Expiration Notifications (within 7 days)
   const servicesAvailedList = Array.isArray(servicesAvailedRaw?.data)
     ? servicesAvailedRaw.data
     : Array.isArray(servicesAvailedRaw)
@@ -466,38 +420,25 @@ export default function Content() {
     if (!row.TransactionDate || !row.ServiceRenewalMonths) return;
     const key = `${row.ClientID}__${row.ServiceName}`;
     const existing = latestPerClientService[key];
-    if (
-      !existing ||
-      dayjs(row.TransactionDate).isAfter(dayjs(existing.TransactionDate))
-    ) {
+    if (!existing || dayjs(row.TransactionDate).isAfter(dayjs(existing.TransactionDate))) {
       latestPerClientService[key] = row;
     }
   });
 
   const serviceExpiryNotifications = Object.values(latestPerClientService)
     .map((row) => {
-      const expirationDate = dayjs(row.TransactionDate).add(
-        parseInt(row.ServiceRenewalMonths),
-        "month"
-      );
+      const expirationDate = dayjs(row.TransactionDate).add(parseInt(row.ServiceRenewalMonths), "month");
       const daysUntil = expirationDate.diff(today, "day");
       return { ...row, expirationDate, daysUntil };
     })
     .filter(({ daysUntil }) => daysUntil >= 0 && daysUntil <= 7)
     .sort((a, b) => a.daysUntil - b.daysUntil)
-    .map(({ ClientName, ServiceName, ServiceRenewalMonths, expirationDate, daysUntil }) => {
-      const label =
-        daysUntil === 0
-          ? "TODAY"
-          : `in ${daysUntil} day${daysUntil !== 1 ? "s" : ""}`;
-      return {
-        text: `"${ServiceName}" for ${ClientName} — ${monthsToLabel(ServiceRenewalMonths)} renewal expires ${expirationDate.format("MMM D, YYYY")}`,
-        badge: daysUntil === 0 ? "TODAY" : `${daysUntil}d`,
-        urgency: daysUntil === 0 ? "critical" : daysUntil <= 3 ? "high" : "medium",
-      };
-    });
+    .map(({ ClientName, ServiceName, ServiceRenewalMonths, expirationDate, daysUntil }) => ({
+      text: `"${ServiceName}" for ${ClientName} — ${monthsToLabel(ServiceRenewalMonths)} renewal expires ${expirationDate.format("MMM D, YYYY")}`,
+      badge: daysUntil === 0 ? "TODAY" : `${daysUntil}d`,
+      urgency: daysUntil === 0 ? "critical" : daysUntil <= 3 ? "high" : "medium",
+    }));
 
-  // 2. Billing Notifications
   const allClientsList = Array.isArray(allClientsRaw?.data)
     ? allClientsRaw.data
     : Array.isArray(allClientsRaw)
@@ -519,11 +460,8 @@ export default function Content() {
     })
     .map((client) => {
       const cycleLabel =
-        client.RetentionType === "Monthly"
-          ? "Monthly"
-          : client.RetentionType === "Quarterly"
-          ? "Quarterly"
-          : "Semi-Annual";
+        client.RetentionType === "Monthly" ? "Monthly" :
+        client.RetentionType === "Quarterly" ? "Quarterly" : "Semi-Annual";
       return {
         text: `${client.TradeName || client.LNF} — ${cycleLabel} billing due end of ${today.format("MMMM YYYY")}`,
         badge: cycleLabel,
@@ -531,60 +469,16 @@ export default function Content() {
       };
     });
 
-  // 3. HR Approval Notifications
   const hrApprovalNotifications = [
-    ...(VLList.length > 0
-      ? [{
-          text: `${VLList.length} Vacation Leave request${VLList.length !== 1 ? "s" : ""} pending approval`,
-          badge: `${VLList.length}`,
-          urgency: "high",
-        }]
-      : []),
-    ...(OTList.length > 0
-      ? [{
-          text: `${OTList.length} Overtime request${OTList.length !== 1 ? "s" : ""} pending approval`,
-          badge: `${OTList.length}`,
-          urgency: "medium",
-        }]
-      : []),
-    ...(loanList.length > 0
-      ? [{
-          text: `${loanList.length} Loan application${loanList.length !== 1 ? "s" : ""} pending approval`,
-          badge: `${loanList.length}`,
-          urgency: "medium",
-        }]
-      : []),
-    ...(AbsentList.length > 0
-      ? [{
-          text: `${AbsentList.length} Absence report${AbsentList.length !== 1 ? "s" : ""} pending approval`,
-          badge: `${AbsentList.length}`,
-          urgency: "medium",
-        }]
-      : []),
-    ...(OTOffList.length > 0
-      ? [{
-          text: `${OTOffList.length} OT-Off request${OTOffList.length !== 1 ? "s" : ""} pending approval`,
-          badge: `${OTOffList.length}`,
-          urgency: "low",
-        }]
-      : []),
-    ...(BackPayList.length > 0
-      ? [{
-          text: `${BackPayList.length} Back Pay request${BackPayList.length !== 1 ? "s" : ""} pending approval`,
-          badge: `${BackPayList.length}`,
-          urgency: "low",
-        }]
-      : []),
-    ...(otherDeductionList.length > 0
-      ? [{
-          text: `${otherDeductionList.length} Other Deduction request${otherDeductionList.length !== 1 ? "s" : ""} pending approval`,
-          badge: `${otherDeductionList.length}`,
-          urgency: "low",
-        }]
-      : []),
+    ...(VLList.length > 0 ? [{ text: `${VLList.length} Vacation Leave request${VLList.length !== 1 ? "s" : ""} pending approval`, badge: `${VLList.length}`, urgency: "high" }] : []),
+    ...(OTList.length > 0 ? [{ text: `${OTList.length} Overtime request${OTList.length !== 1 ? "s" : ""} pending approval`, badge: `${OTList.length}`, urgency: "medium" }] : []),
+    ...(loanList.length > 0 ? [{ text: `${loanList.length} Loan application${loanList.length !== 1 ? "s" : ""} pending approval`, badge: `${loanList.length}`, urgency: "medium" }] : []),
+    ...(AbsentList.length > 0 ? [{ text: `${AbsentList.length} Absence report${AbsentList.length !== 1 ? "s" : ""} pending approval`, badge: `${AbsentList.length}`, urgency: "medium" }] : []),
+    ...(OTOffList.length > 0 ? [{ text: `${OTOffList.length} OT-Off request${OTOffList.length !== 1 ? "s" : ""} pending approval`, badge: `${OTOffList.length}`, urgency: "low" }] : []),
+    ...(BackPayList.length > 0 ? [{ text: `${BackPayList.length} Back Pay request${BackPayList.length !== 1 ? "s" : ""} pending approval`, badge: `${BackPayList.length}`, urgency: "low" }] : []),
+    ...(otherDeductionList.length > 0 ? [{ text: `${otherDeductionList.length} Other Deduction request${otherDeductionList.length !== 1 ? "s" : ""} pending approval`, badge: `${otherDeductionList.length}`, urgency: "low" }] : []),
   ];
 
-  // Categorized Map
   const categorizedNotifications = {
     SERVICE_EXPIRY: serviceExpiryNotifications,
     BILLING: billingNotifications,
@@ -592,24 +486,21 @@ export default function Content() {
   };
 
   const totalNotifications =
-    serviceExpiryNotifications.length +
-    billingNotifications.length +
-    hrApprovalNotifications.length;
+    serviceExpiryNotifications.length + billingNotifications.length + hrApprovalNotifications.length;
 
-  const criticalCount = [
-    ...serviceExpiryNotifications,
-    ...hrApprovalNotifications,
-  ].filter((n) => n.urgency === "critical").length;
+  const criticalCount = [...serviceExpiryNotifications, ...hrApprovalNotifications]
+    .filter((n) => n.urgency === "critical").length;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      {/* Dashboard Title with Actions */}
+
+      {/* Dashboard Title */}
       <Paper
         elevation={0}
         sx={{
           p: 3,
           backgroundColor: colors.headerBg,
-          border: `2px solid ${colors.headerBorder}`,
+          border: `1px solid ${colors.headerBorder}`,
           borderRadius: 2,
           display: "flex",
           justifyContent: "space-between",
@@ -676,7 +567,7 @@ export default function Content() {
             elevation={0}
             sx={{
               height: "100%",
-              border: `2px solid ${colors.cardBorder}`,
+              border: `1px solid ${colors.cardBorder}`,
               borderRadius: 2,
               backgroundColor: colors.cardBg,
             }}
@@ -694,11 +585,7 @@ export default function Content() {
               <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, color: colors.text }}>
                 No. of Clients
               </Typography>
-              <Typography
-                variant="h1"
-                fontWeight="bold"
-                sx={{ color: colors.text, fontSize: "4rem" }}
-              >
+              <Typography variant="h1" fontWeight="bold" sx={{ color: colors.text, fontSize: "4rem" }}>
                 {clientStats.total}
               </Typography>
               <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 1, mb: 2 }}>
@@ -735,36 +622,19 @@ export default function Content() {
             elevation={0}
             sx={{
               height: "100%",
-              border: `2px solid ${colors.cardBorder}`,
+              border: `1px solid ${colors.cardBorder}`,
               borderRadius: 2,
               backgroundColor: colors.cardBg,
             }}
           >
             <CardContent sx={{ p: 3 }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
                 <Typography variant="h6" fontWeight="bold" sx={{ color: colors.text }}>
                   Client Status Distribution
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                  <Chip
-                    icon={<TrendingUpIcon />}
-                    label={`${activePercentage}% Active`}
-                    color="success"
-                    size="small"
-                  />
-                  <Chip
-                    icon={<TrendingDownIcon />}
-                    label={`${inactivePercentage}% Inactive`}
-                    color="error"
-                    size="small"
-                  />
+                  <Chip icon={<TrendingUpIcon />}   label={`${activePercentage}% Active`}   color="success" size="small" />
+                  <Chip icon={<TrendingDownIcon />} label={`${inactivePercentage}% Inactive`} color="error"   size="small" />
                   <Tooltip title={`Toggle to ${chartType === "pie" ? "Bar" : "Pie"} Chart`}>
                     <IconButton size="small" onClick={handleToggleChartType}>
                       <VisibilityIcon sx={{ color: colors.text }} />
@@ -773,25 +643,16 @@ export default function Content() {
                 </Box>
               </Box>
 
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  minHeight: 300,
-                }}
-              >
+              <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 300 }}>
                 {chartType === "pie" ? (
                   <PieChart
-                    series={[
-                      {
-                        data: clientStatusData,
-                        highlightScope: { faded: "global", highlighted: "item" },
-                        faded: { innerRadius: 30, additionalRadius: -30, color: "gray" },
-                        arcLabel: (item) => `${item.value}`,
-                        arcLabelMinAngle: 35,
-                      },
-                    ]}
+                    series={[{
+                      data: clientStatusData,
+                      highlightScope: { faded: "global", highlighted: "item" },
+                      faded: { innerRadius: 30, additionalRadius: -30, color: "gray" },
+                      arcLabel: (item) => `${item.value}`,
+                      arcLabelMinAngle: 35,
+                    }]}
                     height={300}
                     colors={[chartColors.active, chartColors.inactive]}
                     slotProps={{
@@ -811,11 +672,7 @@ export default function Content() {
                 ) : (
                   <BarChart
                     dataset={clientStatusData}
-                    xAxis={[{
-                      scaleType: "band",
-                      dataKey: "label",
-                      tickLabelStyle: { fill: colors.text },
-                    }]}
+                    xAxis={[{ scaleType: "band", dataKey: "label", tickLabelStyle: { fill: colors.text } }]}
                     yAxis={[{ tickLabelStyle: { fill: colors.text } }]}
                     series={[{ dataKey: "value", label: "Number of Clients" }]}
                     colors={[chartColors.active, chartColors.inactive]}
@@ -836,77 +693,30 @@ export default function Content() {
               </Box>
               <Grid container spacing={1}>
                 <Grid item xs={12} sm={4}>
-                  <Box
-                    sx={{
-                      p: 1.5,
-                      border: `1px solid ${colors.cardBorder}`,
-                      borderRadius: 1,
-                      textAlign: "center",
-                      backgroundColor: darkMode ? alpha(chartColors.primary, 0.1) : "#e3f2fd",
-                    }}
-                  >
-                    <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                      Sole Proprietor
-                    </Typography>
-                    <Typography variant="h6" fontWeight="bold" sx={{ color: colors.text }}>
-                      {clientStats.soleProprietor}
-                    </Typography>
+                  <Box sx={{ p: 1.5, border: `1px solid ${colors.cardBorder}`, borderRadius: 1, textAlign: "center", backgroundColor: darkMode ? alpha(chartColors.primary, 0.1) : "#e3f2fd" }}>
+                    <Typography variant="caption" sx={{ color: colors.textSecondary }}>Sole Proprietor</Typography>
+                    <Typography variant="h6" fontWeight="bold" sx={{ color: colors.text }}>{clientStats.soleProprietor}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={12} sm={4}>
-                  <Box
-                    sx={{
-                      p: 1.5,
-                      border: `1px solid ${colors.cardBorder}`,
-                      borderRadius: 1,
-                      textAlign: "center",
-                      backgroundColor: darkMode ? alpha(chartColors.purple, 0.1) : "#f3e5f5",
-                    }}
-                  >
-                    <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                      Corporation
-                    </Typography>
-                    <Typography variant="h6" fontWeight="bold" sx={{ color: colors.text }}>
-                      {clientStats.corporation}
-                    </Typography>
+                  <Box sx={{ p: 1.5, border: `1px solid ${colors.cardBorder}`, borderRadius: 1, textAlign: "center", backgroundColor: darkMode ? alpha(chartColors.purple, 0.1) : "#f3e5f5" }}>
+                    <Typography variant="caption" sx={{ color: colors.textSecondary }}>Corporation</Typography>
+                    <Typography variant="h6" fontWeight="bold" sx={{ color: colors.text }}>{clientStats.corporation}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={12} sm={4}>
-                  <Box
-                    sx={{
-                      p: 1.5,
-                      border: `1px solid ${colors.cardBorder}`,
-                      borderRadius: 1,
-                      textAlign: "center",
-                      backgroundColor: darkMode ? alpha(chartColors.orange, 0.1) : "#fff3e0",
-                    }}
-                  >
-                    <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                      COOP
-                    </Typography>
-                    <Typography variant="h6" fontWeight="bold" sx={{ color: colors.text }}>
-                      {clientStats.coop}
-                    </Typography>
+                  <Box sx={{ p: 1.5, border: `1px solid ${colors.cardBorder}`, borderRadius: 1, textAlign: "center", backgroundColor: darkMode ? alpha(chartColors.orange, 0.1) : "#fff3e0" }}>
+                    <Typography variant="caption" sx={{ color: colors.textSecondary }}>COOP</Typography>
+                    <Typography variant="h6" fontWeight="bold" sx={{ color: colors.text }}>{clientStats.coop}</Typography>
                   </Box>
                 </Grid>
               </Grid>
 
               <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => navigate("/dashboard/clients")}
-                  fullWidth
-                  sx={{ color: colors.text, borderColor: colors.cardBorder }}
-                >
+                <Button variant="outlined" size="small" onClick={() => navigate("/dashboard/clients")} fullWidth sx={{ color: colors.text, borderColor: colors.cardBorder }}>
                   View All Clients
                 </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={() => navigate("/dashboard/clients")}
-                  fullWidth
-                >
+                <Button variant="contained" size="small" onClick={() => navigate("/dashboard/clients")} fullWidth>
                   Add New Client
                 </Button>
               </Box>
@@ -915,7 +725,7 @@ export default function Content() {
         </Grid>
       </Grid>
 
-      {/* ── NOTIFICATIONS SECTION (Redesigned) ─────────────────────── */}
+      {/* ── NOTIFICATIONS SECTION ─────────────────────────────────── */}
       <Paper
         elevation={0}
         sx={{
@@ -925,15 +735,7 @@ export default function Content() {
           borderRadius: 2,
         }}
       >
-        {/* Section Header */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 2.5,
-          }}
-        >
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2.5 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <Badge badgeContent={criticalCount} color="error">
               <NotificationsIcon sx={{ color: colors.text, fontSize: 24 }} />
@@ -944,51 +746,27 @@ export default function Content() {
           </Box>
           <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
             {criticalCount > 0 && (
-              <Chip
-                label={`${criticalCount} Critical`}
-                size="small"
-                color="error"
-                variant="filled"
-                sx={{ fontWeight: 700, fontSize: "0.7rem" }}
-              />
+              <Chip label={`${criticalCount} Critical`} size="small" color="error" variant="filled" sx={{ fontWeight: 700, fontSize: "0.7rem" }} />
             )}
-            <Chip
-              label={`${totalNotifications} Total`}
-              size="small"
-              color="primary"
-              variant="outlined"
-              sx={{ fontWeight: 600, fontSize: "0.7rem" }}
-            />
+            <Chip label={`${totalNotifications} Total`} size="small" color="primary" variant="outlined" sx={{ fontWeight: 600, fontSize: "0.7rem" }} />
           </Box>
         </Box>
 
-        {/* Legend */}
         <Box
           sx={{
-            display: "flex",
-            gap: 2,
-            mb: 2.5,
-            pb: 2,
+            display: "flex", gap: 2, mb: 2.5, pb: 2,
             borderBottom: `1px solid ${colors.notificationBorder}`,
             flexWrap: "wrap",
           }}
         >
           {[
             { label: "Critical", color: "#ef4444" },
-            { label: "High", color: "#f59e0b" },
-            { label: "Medium", color: "#3b82f6" },
-            { label: "Low", color: "#6b7280" },
+            { label: "High",     color: "#f59e0b" },
+            { label: "Medium",   color: "#3b82f6" },
+            { label: "Low",      color: "#6b7280" },
           ].map((item) => (
             <Box key={item.label} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-              <Box
-                sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  backgroundColor: item.color,
-                  boxShadow: `0 0 5px ${item.color}88`,
-                }}
-              />
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: item.color, boxShadow: `0 0 5px ${item.color}88` }} />
               <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: "0.7rem" }}>
                 {item.label}
               </Typography>
@@ -996,88 +774,41 @@ export default function Content() {
           ))}
         </Box>
 
-        {/* Category Panels */}
         {totalNotifications === 0 ? (
-          <Box
-            sx={{
-              py: 5,
-              textAlign: "center",
-              color: colors.textSecondary,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 1,
-            }}
-          >
+          <Box sx={{ py: 5, textAlign: "center", color: colors.textSecondary, display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
             <NotificationsIcon sx={{ fontSize: 40, opacity: 0.3 }} />
             <Typography variant="body2">No notifications at this time.</Typography>
           </Box>
         ) : (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
             {Object.entries(categorizedNotifications).map(([categoryKey, items]) => (
-              <NotificationCategoryPanel
-                key={categoryKey}
-                category={categoryKey}
-                items={items}
-                darkMode={darkMode}
-              />
+              <NotificationCategoryPanel key={categoryKey} category={categoryKey} items={items} darkMode={darkMode} />
             ))}
           </Box>
         )}
       </Paper>
 
-      {/* Additional Analytics Section */}
+      {/* Additional Analytics */}
       <Grid container spacing={2}>
-        {/* Employee Hiring Trends */}
         {empHireList.length > 0 && (
           <Grid item xs={12} md={6}>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 3,
-                border: `1px solid ${colors.cardBorder}`,
-                borderRadius: 2,
-                height: "100%",
-                backgroundColor: colors.cardBg,
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
+            <Paper elevation={0} sx={{ p: 3, border: `1px solid ${colors.cardBorder}`, borderRadius: 2, height: "100%", backgroundColor: colors.cardBg }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
                 <Typography variant="h6" fontWeight="bold" sx={{ color: colors.text }}>
                   Hiring Trends - {year}
                 </Typography>
                 <TextField
-                  select
-                  size="small"
-                  value={year}
+                  select size="small" value={year}
                   onChange={(e) => setYear(e.target.value)}
                   SelectProps={{ native: true }}
-                  sx={{
-                    width: 100,
-                    "& .MuiOutlinedInput-root": {
-                      color: colors.text,
-                      "& fieldset": { borderColor: colors.cardBorder },
-                    },
-                  }}
+                  sx={{ width: 100, "& .MuiOutlinedInput-root": { color: colors.text, "& fieldset": { borderColor: colors.cardBorder } } }}
                 >
-                  {[2024, 2025, 2026].map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
+                  {[2024, 2025, 2026].map((y) => <option key={y} value={y}>{y}</option>)}
                 </TextField>
               </Box>
               <BarChart
                 dataset={empHireList}
-                xAxis={[{
-                  scaleType: "band",
-                  dataKey: "month",
-                  tickLabelStyle: { fill: colors.text },
-                }]}
+                xAxis={[{ scaleType: "band", dataKey: "month", tickLabelStyle: { fill: colors.text } }]}
                 yAxis={[{ tickLabelStyle: { fill: colors.text } }]}
                 series={[{ dataKey: "count", label: "Employees Hired", color: chartColors.primary }]}
                 height={300}
@@ -1091,35 +822,23 @@ export default function Content() {
           </Grid>
         )}
 
-        {/* Workforce Distribution */}
         {workforceList.length > 0 && (
           <Grid item xs={12} md={6}>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 3,
-                border: `1px solid ${colors.cardBorder}`,
-                borderRadius: 2,
-                height: "100%",
-                backgroundColor: colors.cardBg,
-              }}
-            >
+            <Paper elevation={0} sx={{ p: 3, border: `1px solid ${colors.cardBorder}`, borderRadius: 2, height: "100%", backgroundColor: colors.cardBg }}>
               <Typography variant="h6" fontWeight="bold" sx={{ mb: 2, color: colors.text }}>
                 Workforce Distribution
               </Typography>
               <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
                 <PieChart
-                  series={[
-                    {
-                      data: workforceList.map((item, index) => ({
-                        id: index,
-                        value: item.count || 0,
-                        label: item.category || "Unknown",
-                      })),
-                      highlightScope: { faded: "global", highlighted: "item" },
-                      faded: { innerRadius: 30, additionalRadius: -30, color: "gray" },
-                    },
-                  ]}
+                  series={[{
+                    data: workforceList.map((item, index) => ({
+                      id: index,
+                      value: item.count || 0,
+                      label: item.category || "Unknown",
+                    })),
+                    highlightScope: { faded: "global", highlighted: "item" },
+                    faded: { innerRadius: 30, additionalRadius: -30, color: "gray" },
+                  }]}
                   height={300}
                   slotProps={{
                     legend: {

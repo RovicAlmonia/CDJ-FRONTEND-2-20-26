@@ -1,24 +1,28 @@
 // ============================================================
 // RevenueReport.jsx — CDJ Accounting & Auditing Office
-// UI: WooCommerce Analytics style
-// Excel: Professional CDJ financial report format
+// MUI style aligned with TransactionInt.jsx patterns
 // ============================================================
+import React from "react";
 import {
-  Box, Button, Card, CardContent, FormControl, InputLabel,
-  MenuItem, Select, Skeleton, Stack, Tab, Tabs, Typography, useTheme,
+  Box, Button, MenuItem, Select, Skeleton, Stack, Tab, Tabs,
+  Typography, useTheme, Paper, Chip, InputAdornment,
+  Table, TableHead, TableBody, TableFooter, TableRow, TableCell,
+  TableContainer, alpha, Collapse, IconButton, Tooltip, CircularProgress,
 } from "@mui/material";
-import TrendingUpIcon           from "@mui/icons-material/TrendingUp";
-import TrendingDownIcon         from "@mui/icons-material/TrendingDown";
-import PaidIcon                 from "@mui/icons-material/Paid";
-import ReceiptLongIcon          from "@mui/icons-material/ReceiptLong";
-import GroupIcon                from "@mui/icons-material/Group";
-import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
-import { useQuery }             from "@tanstack/react-query";
-import { http }                 from "../../api/http";
+import TrendingUpIcon            from "@mui/icons-material/TrendingUp";
+import PaidIcon                  from "@mui/icons-material/Paid";
+import ReceiptLongIcon           from "@mui/icons-material/ReceiptLong";
+import GroupIcon                 from "@mui/icons-material/Group";
+import AccountBalanceWalletIcon  from "@mui/icons-material/AccountBalanceWallet";
+import FileDownloadOutlinedIcon  from "@mui/icons-material/FileDownloadOutlined";
+import BarChartIcon              from "@mui/icons-material/BarChart";
+import KeyboardArrowDownIcon     from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowRightIcon    from "@mui/icons-material/KeyboardArrowRight";
+import PeopleAltIcon             from "@mui/icons-material/PeopleAlt";
+import { useQuery }              from "@tanstack/react-query";
+import { http }                  from "../../api/http";
 import {
-  AreaChart, Area, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
 } from "recharts";
 import { useState } from "react";
 
@@ -34,11 +38,11 @@ const short = (val) => {
   const n = parseFloat(val || 0);
   if (n >= 1_000_000) return "₱" + (n / 1_000_000).toFixed(1) + "M";
   if (n >= 1_000)     return "₱" + (n / 1_000).toFixed(1) + "K";
-  return "₱" + n.toFixed(2);
+  return "₱" + n.toFixed(0);
 };
 
 const pct = (num, den) =>
-  den > 0 ? ((num / den) * 100).toFixed(1) + "%" : "0.0%";
+  parseFloat(den) > 0 ? ((parseFloat(num) / parseFloat(den)) * 100).toFixed(1) + "%" : "—";
 
 const MONTHS = [
   "January","February","March","April","May","June",
@@ -60,7 +64,7 @@ const scaffold12 = (data) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EXCEL EXPORT — CDJ Professional Financial Report Format
+// EXCEL EXPORT
 // ─────────────────────────────────────────────────────────────────────────────
 const exportToExcel = async ({ year, month, summary, monthly12, services, topClients }) => {
   const XLSX = await new Promise(resolve => {
@@ -73,480 +77,121 @@ const exportToExcel = async ({ year, month, summary, monthly12, services, topCli
 
   const periodLabel = month ? `${MONTHS[month-1]} ${year}` : `Full Year ${year}`;
   const wb = XLSX.utils.book_new();
-
-  // ── Color palette ────────────────────────────────────────────────────────
   const P = {
-    darkGreen:   "1E6B3C",
-    midGreen:    "27AE60",
-    lightGreen:  "E9F7EF",
-    maroon:      "7B1D14",
-    maroonMid:   "B03A2E",
-    maroonLight: "FCEAE8",
-    gold:        "7D6608",
-    goldLight:   "FEF9E7",
-    blue:        "154360",
-    blueLight:   "EBF5FB",
-    red:         "922B21",
-    redLight:    "FDEDEC",
-    white:       "FFFFFF",
-    nearWhite:   "F8F9FA",
-    grey1:       "212529",
-    grey2:       "495057",
-    grey3:       "ADB5BD",
-    grey4:       "DEE2E6",
-    stripe:      "F2F2F2",
+    darkGreen:"1E6B3C", maroon:"7B1D14", maroonMid:"B03A2E",
+    gold:"7D6608", blue:"154360", red:"922B21",
+    white:"FFFFFF", grey1:"212529", grey2:"495057",
+    grey3:"ADB5BD", grey4:"DEE2E6", stripe:"F2F2F2",
   };
-
   const bd = (c = P.grey4) => ({
-    top:    { style:"thin", color:{ rgb:c } },
-    bottom: { style:"thin", color:{ rgb:c } },
-    left:   { style:"thin", color:{ rgb:c } },
-    right:  { style:"thin", color:{ rgb:c } },
+    top:{style:"thin",color:{rgb:c}}, bottom:{style:"thin",color:{rgb:c}},
+    left:{style:"thin",color:{rgb:c}}, right:{style:"thin",color:{rgb:c}},
   });
-
-  // ── Reusable cell styles ─────────────────────────────────────────────────
   const STYLES = {
-    bigTitle: {
-      font: { bold:true, sz:20, color:{ rgb:P.maroon } },
-      alignment: { horizontal:"left", vertical:"center" },
-    },
-    subTitle: {
-      font: { sz:11, color:{ rgb:P.grey2 } },
-      alignment: { horizontal:"left", vertical:"center" },
-    },
-    meta: {
-      font: { sz:9, italic:true, color:{ rgb:P.grey3 } },
-      alignment: { horizontal:"left", vertical:"center" },
-    },
-    sectionHeader: (bg = P.darkGreen) => ({
-      font: { bold:true, sz:10, color:{ rgb:P.white } },
-      fill: { fgColor:{ rgb:bg } },
-      alignment: { horizontal:"left", vertical:"center", indent:1 },
-      border: bd(bg),
-    }),
-    colHead: (bg = P.darkGreen) => ({
-      font: { bold:true, sz:9, color:{ rgb:P.white } },
-      fill: { fgColor:{ rgb:bg } },
-      alignment: { horizontal:"center", vertical:"center", wrapText:true },
-      border: bd(bg),
-    }),
-    rowLabel: (bg = P.white, bold = false) => ({
-      font: { sz:10, bold, color:{ rgb:P.grey1 } },
-      fill: { fgColor:{ rgb:bg } },
-      alignment: { horizontal:"left", vertical:"center", indent:1 },
-      border: bd(P.grey4),
-    }),
-    num: (bg = P.white, bold = false, color = P.grey1) => ({
-      font: { sz:10, bold, color:{ rgb:color } },
-      fill: { fgColor:{ rgb:bg } },
-      alignment: { horizontal:"right", vertical:"center" },
-      border: bd(P.grey4),
-    }),
-    totalLabel: {
-      font: { bold:true, sz:10, color:{ rgb:P.white } },
-      fill: { fgColor:{ rgb:P.maroon } },
-      alignment: { horizontal:"left", vertical:"center", indent:1 },
-      border: bd(P.maroon),
-    },
-    totalNum: (color = P.white) => ({
-      font: { bold:true, sz:10, color:{ rgb:color } },
-      fill: { fgColor:{ rgb:P.maroon } },
-      alignment: { horizontal:"right", vertical:"center" },
-      border: bd(P.maroon),
-    }),
-    footnote: {
-      font: { sz:8, italic:true, color:{ rgb:P.grey3 } },
-      alignment: { horizontal:"left", vertical:"center" },
-    },
+    bigTitle:      { font:{bold:true,sz:20,color:{rgb:P.maroon}}, alignment:{horizontal:"left",vertical:"center"} },
+    subTitle:      { font:{sz:11,color:{rgb:P.grey2}}, alignment:{horizontal:"left",vertical:"center"} },
+    meta:          { font:{sz:9,italic:true,color:{rgb:P.grey3}}, alignment:{horizontal:"left",vertical:"center"} },
+    sectionHeader: (bg=P.darkGreen) => ({ font:{bold:true,sz:10,color:{rgb:P.white}}, fill:{fgColor:{rgb:bg}}, alignment:{horizontal:"left",vertical:"center",indent:1}, border:bd(bg) }),
+    colHead:       (bg=P.darkGreen) => ({ font:{bold:true,sz:9,color:{rgb:P.white}}, fill:{fgColor:{rgb:bg}}, alignment:{horizontal:"center",vertical:"center",wrapText:true}, border:bd(bg) }),
+    rowLabel:      (bg=P.white, bold=false) => ({ font:{sz:10,bold,color:{rgb:P.grey1}}, fill:{fgColor:{rgb:bg}}, alignment:{horizontal:"left",vertical:"center",indent:1}, border:bd(P.grey4) }),
+    num:           (bg=P.white, bold=false, color=P.grey1) => ({ font:{sz:10,bold,color:{rgb:color}}, fill:{fgColor:{rgb:bg}}, alignment:{horizontal:"right",vertical:"center"}, border:bd(P.grey4) }),
+    totalLabel:    { font:{bold:true,sz:10,color:{rgb:P.white}}, fill:{fgColor:{rgb:P.maroon}}, alignment:{horizontal:"left",vertical:"center",indent:1}, border:bd(P.maroon) },
+    totalNum:      (color=P.white) => ({ font:{bold:true,sz:10,color:{rgb:color}}, fill:{fgColor:{rgb:P.maroon}}, alignment:{horizontal:"right",vertical:"center"}, border:bd(P.maroon) }),
+    footnote:      { font:{sz:8,italic:true,color:{rgb:P.grey3}}, alignment:{horizontal:"left",vertical:"center"} },
   };
+  const C_FMT='"₱"#,##0.00', N_FMT="#,##0";
+  const wc=(ws,ref,val,style,numFmt)=>{ ws[ref]={v:val,t:typeof val==="number"?"n":"s",s:style}; if(numFmt) ws[ref].z=numFmt; };
+  const ec=(r,c)=>XLSX.utils.encode_cell({r,c});
 
-  const C_FMT   = '"₱"#,##0.00';
-  const N_FMT   = "#,##0";
-  const PCT_FMT = '0.0"%"';
-
-  // Helper: write a cell
-  const wc = (ws, ref, val, style, numFmt) => {
-    ws[ref] = {
-      v: val,
-      t: typeof val === "number" ? "n" : "s",
-      s: style,
-    };
-    if (numFmt) ws[ref].z = numFmt;
-  };
-
-  // Helper: encode cell from row/col (0-based)
-  const ec = (r, c) => XLSX.utils.encode_cell({ r, c });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // SHEET 1 — EXECUTIVE SUMMARY
-  // ─────────────────────────────────────────────────────────────────────────
+  // Sheet 1 — Executive Summary
   (() => {
-    const ws = {};
-    const merges = [];
-    let r = 0;
-
-    // Row 0: Big title
-    wc(ws, ec(r,0), "CDJ ACCOUNTING AND AUDITING OFFICE", STYLES.bigTitle);
-    merges.push({ s:{r,c:0}, e:{r,c:3} }); r++;
-
-    // Row 1: subtitle
-    wc(ws, ec(r,0), "REVENUE REPORT — EXECUTIVE SUMMARY", STYLES.subTitle);
-    merges.push({ s:{r,c:0}, e:{r,c:3} }); r++;
-
-    // Row 2: period
-    wc(ws, ec(r,0), `Reporting Period: ${periodLabel}`, {
-      font:{ bold:true, sz:10, color:{ rgb:P.maroon } },
-      alignment:{ horizontal:"left", vertical:"center" },
+    const ws={}, merges=[]; let r=0;
+    wc(ws,ec(r,0),"CDJ ACCOUNTING AND AUDITING OFFICE",STYLES.bigTitle); merges.push({s:{r,c:0},e:{r,c:3}}); r++;
+    wc(ws,ec(r,0),"REVENUE REPORT — EXECUTIVE SUMMARY",STYLES.subTitle); merges.push({s:{r,c:0},e:{r,c:3}}); r++;
+    wc(ws,ec(r,0),`Reporting Period: ${periodLabel}`,{font:{bold:true,sz:10,color:{rgb:P.maroon}},alignment:{horizontal:"left"}}); merges.push({s:{r,c:0},e:{r,c:3}}); r++;
+    wc(ws,ec(r,0),`Generated: ${new Date().toLocaleString("en-PH")}`,STYLES.meta); merges.push({s:{r,c:0},e:{r,c:3}}); r++;r++;
+    wc(ws,ec(r,0),"I.  SUMMARY OF REVENUE",STYLES.sectionHeader()); merges.push({s:{r,c:0},e:{r,c:3}}); r++;
+    ["METRIC","AMOUNT (₱)","% OF GROSS","NOTES"].forEach((h,ci)=>wc(ws,ec(r,ci),h,STYLES.colHead())); r++;
+    const grossVal=parseFloat(summary.TotalGross||0);
+    [["Gross Revenue",grossVal,"100.00%","Total billed",P.white,false,P.grey1],
+     ["Less: Discounts",parseFloat(summary.TotalDiscount||0),grossVal>0?pct(summary.TotalDiscount,grossVal):"—","Discounts",P.stripe,false,P.red],
+     ["Net Revenue",parseFloat(summary.TotalNet||0),grossVal>0?pct(summary.TotalNet,grossVal):"—","Gross less discounts",P.white,true,P.maroon],
+     ["Collected",parseFloat(summary.TotalCollected||0),pct(summary.TotalCollected,summary.TotalNet),"Payments received",P.stripe,false,P.blue],
+     ["Outstanding",parseFloat(summary.TotalOutstanding||0),pct(summary.TotalOutstanding,summary.TotalNet),"Unpaid",P.white,false,P.red],
+    ].forEach(([label,amt,pctStr,note,bg,bold,color])=>{
+      wc(ws,ec(r,0),label,STYLES.rowLabel(bg,bold));
+      wc(ws,ec(r,1),amt,STYLES.num(bg,bold,color),C_FMT); ws[ec(r,1)].t="n";
+      wc(ws,ec(r,2),pctStr,STYLES.num(bg,false,color));
+      wc(ws,ec(r,3),note,{...STYLES.rowLabel(bg),font:{sz:9,italic:true,color:{rgb:P.grey2}}}); r++;
     });
-    merges.push({ s:{r,c:0}, e:{r,c:3} }); r++;
+    wc(ws,ec(r,0),"Collection Rate",STYLES.totalLabel);
+    wc(ws,ec(r,1),pct(summary.TotalCollected,summary.TotalNet),STYLES.totalNum());
+    wc(ws,ec(r,2),"",STYLES.totalNum()); wc(ws,ec(r,3),"Collected ÷ Net",{...STYLES.totalLabel,font:{sz:9,italic:true,color:{rgb:P.white}}}); r++;r++;
+    r++; wc(ws,ec(r,0),"* All values in Philippine Peso (₱).",STYLES.footnote); merges.push({s:{r,c:0},e:{r,c:3}});
+    ws["!cols"]=[{wch:32},{wch:20},{wch:14},{wch:38}]; ws["!merges"]=merges;
+    ws["!pageSetup"]={paperSize:9,orientation:"portrait",fitToPage:true,fitToWidth:1,fitToHeight:0};
+    ws["!ref"]=`A1:${ec(r,3)}`; XLSX.utils.book_append_sheet(wb,ws,"Executive Summary");
+  })();
 
-    // Row 3: generated
-    wc(ws, ec(r,0), `Date Generated: ${new Date().toLocaleString("en-PH")}`, STYLES.meta);
-    merges.push({ s:{r,c:0}, e:{r,c:3} }); r++;
-    r++; // spacer row
-
-    // ── REVENUE SUMMARY TABLE ────────────────────────────────────────────
-    wc(ws, ec(r,0), "I.  SUMMARY OF REVENUE", STYLES.sectionHeader());
-    merges.push({ s:{r,c:0}, e:{r,c:3} }); r++;
-
-    ["METRIC", "AMOUNT (₱)", "% OF GROSS", "NOTES"].forEach((h, ci) => {
-      wc(ws, ec(r,ci), h, STYLES.colHead());
+  // Sheet 2 — Monthly
+  (() => {
+    const ws={}, merges=[]; let r=0;
+    wc(ws,ec(r,0),"CDJ ACCOUNTING AND AUDITING OFFICE",STYLES.bigTitle); merges.push({s:{r,c:0},e:{r,c:6}}); r++;
+    wc(ws,ec(r,0),`MONTHLY REVENUE SCHEDULE — ${year}`,STYLES.subTitle); merges.push({s:{r,c:0},e:{r,c:6}}); r++;
+    wc(ws,ec(r,0),`Generated: ${new Date().toLocaleString("en-PH")}`,STYLES.meta); merges.push({s:{r,c:0},e:{r,c:6}}); r++;r++;
+    wc(ws,ec(r,0),"MONTHLY REVENUE BREAKDOWN",STYLES.sectionHeader()); merges.push({s:{r,c:0},e:{r,c:6}}); r++;
+    ["MONTH","GROSS","DISCOUNTS","NET","COLLECTED","OUTSTANDING","TXN"].forEach((h,ci)=>
+      wc(ws,ec(r,ci),h,STYLES.colHead([P.darkGreen,P.darkGreen,P.red,P.maroon,P.blue,P.maroon,P.darkGreen][ci]))); r++;
+    monthly12.forEach((row,i)=>{
+      const bg=i%2===0?P.white:P.stripe, disc=row.TotalGross-row.TotalNet, dim=row.TotalGross===0;
+      wc(ws,ec(r,0),row.month,STYLES.rowLabel(bg,true));
+      [row.TotalGross,disc,row.TotalNet,row.TotalCollected,row.TotalOutstanding].forEach((v,ci)=>{
+        ws[ec(r,ci+1)]={v,t:"n",s:STYLES.num(bg,ci===2,dim?P.grey3:[P.grey1,P.red,P.maroon,P.blue,P.red][ci]),z:C_FMT};
+      });
+      ws[ec(r,6)]={v:row.TotalTransactions,t:"n",s:STYLES.num(bg,false,dim?P.grey3:P.grey1),z:N_FMT}; r++;
     });
-    r++;
-
-    const grossVal = parseFloat(summary.TotalGross || 0);
-    const rows = [
-      ["Gross Revenue",       grossVal,                                      "100.00%",     "Total billed amount before deductions",    P.white,  false, P.grey1],
-      ["Less: Discounts",     parseFloat(summary.TotalDiscount || 0),        grossVal > 0 ? pct(summary.TotalDiscount, grossVal) : "—", "Discounts applied to invoices", P.stripe, false, P.red],
-      ["Net Revenue",         parseFloat(summary.TotalNet      || 0),        grossVal > 0 ? pct(summary.TotalNet, grossVal)      : "—", "Gross less discounts",          P.white,  true,  P.maroon],
-      ["Collected",           parseFloat(summary.TotalCollected || 0),       pct(summary.TotalCollected, summary.TotalNet),             "Payments received",             P.stripe, false, P.blue],
-      ["Outstanding Balance", parseFloat(summary.TotalOutstanding || 0),     pct(summary.TotalOutstanding, summary.TotalNet),           "Unpaid / pending collection",   P.white,  false, P.red],
+    const [mg,mn,mc,mo,mt]=[
+      monthly12.reduce((a,x)=>a+x.TotalGross,0), monthly12.reduce((a,x)=>a+x.TotalNet,0),
+      monthly12.reduce((a,x)=>a+x.TotalCollected,0), monthly12.reduce((a,x)=>a+x.TotalOutstanding,0),
+      monthly12.reduce((a,x)=>a+x.TotalTransactions,0),
     ];
-    rows.forEach(([label, amt, pctStr, note, bg, bold, color]) => {
-      wc(ws, ec(r,0), label,  STYLES.rowLabel(bg, bold));
-      wc(ws, ec(r,1), amt,    STYLES.num(bg, bold, color), C_FMT); ws[ec(r,1)].t = "n";
-      wc(ws, ec(r,2), pctStr, STYLES.num(bg, false, color));
-      wc(ws, ec(r,3), note,   { ...STYLES.rowLabel(bg), font:{ sz:9, italic:true, color:{ rgb:P.grey2 } } });
-      r++;
-    });
-
-    // Collection rate highlight row
-    wc(ws, ec(r,0), "Collection Rate",  STYLES.totalLabel);
-    wc(ws, ec(r,1), pct(summary.TotalCollected, summary.TotalNet), STYLES.totalNum());
-    wc(ws, ec(r,2), "",                 STYLES.totalNum());
-    wc(ws, ec(r,3), "Collected ÷ Net Revenue", { ...STYLES.totalLabel, font:{ sz:9, italic:true, color:{ rgb:P.white } } });
-    r++; r++;
-
-    // ── ACTIVITY METRICS ─────────────────────────────────────────────────
-    wc(ws, ec(r,0), "II.  TRANSACTION ACTIVITY", STYLES.sectionHeader());
-    merges.push({ s:{r,c:0}, e:{r,c:3} }); r++;
-
-    ["METRIC", "COUNT", "", ""].forEach((h, ci) => {
-      wc(ws, ec(r,ci), h, STYLES.colHead());
-    });
-    r++;
-
-    [
-      ["Total Transactions",    parseInt(summary.TotalTransactions || 0), P.white],
-      ["Unique Clients Served", parseInt(summary.UniqueClients     || 0), P.stripe],
-    ].forEach(([label, val, bg]) => {
-      wc(ws, ec(r,0), label, STYLES.rowLabel(bg));
-      ws[ec(r,1)] = { v:val, t:"n", s:STYLES.num(bg, true, P.grey1), z:N_FMT };
-      wc(ws, ec(r,2), "", STYLES.rowLabel(bg));
-      wc(ws, ec(r,3), "", STYLES.rowLabel(bg));
-      r++;
-    });
-
-    r++;
-    wc(ws, ec(r,0), "* All monetary values are in Philippine Peso (₱). Figures may be subject to rounding.", STYLES.footnote);
-    merges.push({ s:{r,c:0}, e:{r,c:3} });
-
-    ws["!cols"]      = [{ wch:32 }, { wch:20 }, { wch:14 }, { wch:38 }];
-    ws["!rows"]      = [{ hpt:28 }, { hpt:18 }, { hpt:15 }, { hpt:13 }];
-    ws["!merges"]    = merges;
-    ws["!pageSetup"] = { paperSize:9, orientation:"portrait", fitToPage:true, fitToWidth:1, fitToHeight:0 };
-    ws["!ref"]       = `A1:${ec(r, 3)}`;
-    XLSX.utils.book_append_sheet(wb, ws, "Executive Summary");
+    wc(ws,ec(r,0),"TOTAL",STYLES.totalLabel);
+    [[mg],[mg-mn],[mn],[mc],[mo]].forEach(([v],ci)=>{ ws[ec(r,ci+1)]={v,t:"n",s:STYLES.totalNum(),z:C_FMT}; });
+    ws[ec(r,6)]={v:mt,t:"n",s:STYLES.totalNum(),z:N_FMT}; r++;r++;
+    wc(ws,ec(r,0),"* Net = Gross less Discounts.",STYLES.footnote); merges.push({s:{r,c:0},e:{r,c:6}});
+    ws["!cols"]=[{wch:12},{wch:18},{wch:14},{wch:18},{wch:16},{wch:16},{wch:10}]; ws["!merges"]=merges;
+    ws["!pageSetup"]={paperSize:9,orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0};
+    ws["!ref"]=`A1:${ec(r,6)}`; XLSX.utils.book_append_sheet(wb,ws,"Monthly Revenue");
   })();
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SHEET 2 — MONTHLY REVENUE SCHEDULE
-  // ─────────────────────────────────────────────────────────────────────────
-  (() => {
-    const ws = {};
-    const merges = [];
-    let r = 0;
-
-    wc(ws, ec(r,0), "CDJ ACCOUNTING AND AUDITING OFFICE", STYLES.bigTitle);
-    merges.push({ s:{r,c:0}, e:{r,c:6} }); r++;
-    wc(ws, ec(r,0), `MONTHLY REVENUE SCHEDULE — ${year}`, STYLES.subTitle);
-    merges.push({ s:{r,c:0}, e:{r,c:6} }); r++;
-    wc(ws, ec(r,0), `Generated: ${new Date().toLocaleString("en-PH")}`, STYLES.meta);
-    merges.push({ s:{r,c:0}, e:{r,c:6} }); r++;
-    r++;
-
-    wc(ws, ec(r,0), "MONTHLY REVENUE BREAKDOWN", STYLES.sectionHeader());
-    merges.push({ s:{r,c:0}, e:{r,c:6} }); r++;
-
-    const heads = ["MONTH","GROSS REVENUE","DISCOUNTS","NET REVENUE","COLLECTED","OUTSTANDING","TRANSACTIONS"];
-    const hBg   = [P.darkGreen, P.darkGreen, P.red, P.maroon, P.blue, P.maroon, P.darkGreen];
-    heads.forEach((h, ci) => wc(ws, ec(r,ci), h, STYLES.colHead(hBg[ci])));
-    r++;
-
-    monthly12.forEach((row, i) => {
-      const bg   = i % 2 === 0 ? P.white : P.stripe;
-      const disc = row.TotalGross - row.TotalNet;
-      const dim  = row.TotalGross === 0;
-
-      wc(ws, ec(r,0), row.month,           STYLES.rowLabel(bg, true));
-      wc(ws, ec(r,1), row.TotalGross,       STYLES.num(bg, false, dim ? P.grey3 : P.grey1), C_FMT); ws[ec(r,1)].t = "n";
-      wc(ws, ec(r,2), disc,                 STYLES.num(bg, false, dim ? P.grey3 : P.red),   C_FMT); ws[ec(r,2)].t = "n";
-      wc(ws, ec(r,3), row.TotalNet,         STYLES.num(bg, true,  dim ? P.grey3 : P.maroon),C_FMT); ws[ec(r,3)].t = "n";
-      wc(ws, ec(r,4), row.TotalCollected,   STYLES.num(bg, false, dim ? P.grey3 : P.blue),  C_FMT); ws[ec(r,4)].t = "n";
-      wc(ws, ec(r,5), row.TotalOutstanding, STYLES.num(bg, false, dim ? P.grey3 : P.red),   C_FMT); ws[ec(r,5)].t = "n";
-      ws[ec(r,6)] = { v:row.TotalTransactions, t:"n", s:STYLES.num(bg, false, dim ? P.grey3 : P.grey1), z:N_FMT };
-      r++;
-    });
-
-    // Totals row
-    const mg = monthly12.reduce((a,x) => a + x.TotalGross, 0);
-    const mn = monthly12.reduce((a,x) => a + x.TotalNet, 0);
-    const mc = monthly12.reduce((a,x) => a + x.TotalCollected, 0);
-    const mo = monthly12.reduce((a,x) => a + x.TotalOutstanding, 0);
-    const mt = monthly12.reduce((a,x) => a + x.TotalTransactions, 0);
-
-    wc(ws, ec(r,0), "TOTAL",  STYLES.totalLabel);
-    wc(ws, ec(r,1), mg,       STYLES.totalNum(), C_FMT); ws[ec(r,1)].t = "n";
-    wc(ws, ec(r,2), mg - mn,  STYLES.totalNum(), C_FMT); ws[ec(r,2)].t = "n";
-    wc(ws, ec(r,3), mn,       STYLES.totalNum(), C_FMT); ws[ec(r,3)].t = "n";
-    wc(ws, ec(r,4), mc,       STYLES.totalNum(), C_FMT); ws[ec(r,4)].t = "n";
-    wc(ws, ec(r,5), mo,       STYLES.totalNum(), C_FMT); ws[ec(r,5)].t = "n";
-    ws[ec(r,6)] = { v:mt, t:"n", s:STYLES.totalNum(), z:N_FMT };
-    r++; r++;
-
-    wc(ws, ec(r,0), "* Months with ₱0 activity are included for completeness. Net Revenue = Gross less Discounts.", STYLES.footnote);
-    merges.push({ s:{r,c:0}, e:{r,c:6} });
-
-    ws["!cols"]      = [{ wch:14 },{ wch:20 },{ wch:16 },{ wch:20 },{ wch:18 },{ wch:18 },{ wch:14 }];
-    ws["!merges"]    = merges;
-    ws["!pageSetup"] = { paperSize:9, orientation:"landscape", fitToPage:true, fitToWidth:1, fitToHeight:0 };
-    ws["!ref"]       = `A1:${ec(r, 6)}`;
-    XLSX.utils.book_append_sheet(wb, ws, "Monthly Revenue");
-  })();
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // SHEET 3 — SERVICE REVENUE BREAKDOWN
-  // ─────────────────────────────────────────────────────────────────────────
-  (() => {
-    const ws = {};
-    const merges = [];
-    let r = 0;
-
-    wc(ws, ec(r,0), "CDJ ACCOUNTING AND AUDITING OFFICE", STYLES.bigTitle);
-    merges.push({ s:{r,c:0}, e:{r,c:8} }); r++;
-    wc(ws, ec(r,0), `SERVICE REVENUE BREAKDOWN — ${periodLabel}`, STYLES.subTitle);
-    merges.push({ s:{r,c:0}, e:{r,c:8} }); r++;
-    wc(ws, ec(r,0), `Generated: ${new Date().toLocaleString("en-PH")}`, STYLES.meta);
-    merges.push({ s:{r,c:0}, e:{r,c:8} }); r++;
-    r++;
-
-    wc(ws, ec(r,0), "REVENUE BY SERVICE TYPE", STYLES.sectionHeader());
-    merges.push({ s:{r,c:0}, e:{r,c:8} }); r++;
-
-    const heads = ["NO.","SERVICE NAME","TIMES AVAILED","TOTAL QTY","GROSS REVENUE","DISCOUNTS","NET REVENUE","COLLECTED","OUTSTANDING"];
-    const hBg   = [P.darkGreen, P.darkGreen, P.darkGreen, P.darkGreen, P.darkGreen, P.red, P.maroon, P.blue, P.maroon];
-    heads.forEach((h, ci) => wc(ws, ec(r,ci), h, STYLES.colHead(hBg[ci])));
-    r++;
-
-    if (services.length === 0) {
-      wc(ws, ec(r,0), "No data for selected period.", STYLES.rowLabel());
-      merges.push({ s:{r,c:0}, e:{r,c:8} }); r++;
-    } else {
-      services.forEach((s2, i) => {
-        const bg = i % 2 === 0 ? P.white : P.stripe;
-        ws[ec(r,0)] = { v:i+1, t:"n", s:STYLES.num(bg), z:N_FMT };
-        wc(ws, ec(r,1), s2.ServiceName || "—",              STYLES.rowLabel(bg, true));
-        ws[ec(r,2)] = { v:parseInt(s2.TimesAvailed || 0),   t:"n", s:STYLES.num(bg), z:N_FMT };
-        ws[ec(r,3)] = { v:parseInt(s2.TotalQty     || 0),   t:"n", s:STYLES.num(bg), z:N_FMT };
-        ws[ec(r,4)] = { v:parseFloat(s2.TotalGross  || 0),  t:"n", s:STYLES.num(bg, false, P.grey1),  z:C_FMT };
-        ws[ec(r,5)] = { v:parseFloat(s2.TotalDiscount || 0),t:"n", s:STYLES.num(bg, false, P.red),    z:C_FMT };
-        ws[ec(r,6)] = { v:parseFloat(s2.TotalNet    || 0),  t:"n", s:STYLES.num(bg, true,  P.maroon), z:C_FMT };
-        ws[ec(r,7)] = { v:parseFloat(s2.TotalCollected || 0),  t:"n", s:STYLES.num(bg, false, P.blue),  z:C_FMT };
-        ws[ec(r,8)] = { v:parseFloat(s2.TotalOutstanding || 0),t:"n", s:STYLES.num(bg, false, P.red),   z:C_FMT };
-        r++;
-      });
-
-      const tg = services.reduce((a,s2) => a + parseFloat(s2.TotalGross    || 0), 0);
-      const td = services.reduce((a,s2) => a + parseFloat(s2.TotalDiscount || 0), 0);
-      const tn = services.reduce((a,s2) => a + parseFloat(s2.TotalNet      || 0), 0);
-      const tc = services.reduce((a,s2) => a + parseFloat(s2.TotalCollected|| 0), 0);
-      const to = services.reduce((a,s2) => a + parseFloat(s2.TotalOutstanding||0),0);
-      const ta = services.reduce((a,s2) => a + parseInt(s2.TimesAvailed    || 0), 0);
-      const tq = services.reduce((a,s2) => a + parseInt(s2.TotalQty        || 0), 0);
-
-      wc(ws, ec(r,0), "",      STYLES.totalLabel);
-      wc(ws, ec(r,1), "TOTAL", STYLES.totalLabel);
-      ws[ec(r,2)] = { v:ta, t:"n", s:STYLES.totalNum(), z:N_FMT };
-      ws[ec(r,3)] = { v:tq, t:"n", s:STYLES.totalNum(), z:N_FMT };
-      ws[ec(r,4)] = { v:tg, t:"n", s:STYLES.totalNum(), z:C_FMT };
-      ws[ec(r,5)] = { v:td, t:"n", s:STYLES.totalNum(), z:C_FMT };
-      ws[ec(r,6)] = { v:tn, t:"n", s:STYLES.totalNum(), z:C_FMT };
-      ws[ec(r,7)] = { v:tc, t:"n", s:STYLES.totalNum(), z:C_FMT };
-      ws[ec(r,8)] = { v:to, t:"n", s:STYLES.totalNum(), z:C_FMT };
-      r++;
-    }
-
-    r++;
-    wc(ws, ec(r,0), "* Net Revenue = Gross Revenue less Discounts. Collected + Outstanding = Net Revenue.", STYLES.footnote);
-    merges.push({ s:{r,c:0}, e:{r,c:8} });
-
-    ws["!cols"]      = [{ wch:5 },{ wch:36 },{ wch:14 },{ wch:10 },{ wch:20 },{ wch:16 },{ wch:20 },{ wch:18 },{ wch:18 }];
-    ws["!merges"]    = merges;
-    ws["!pageSetup"] = { paperSize:9, orientation:"landscape", fitToPage:true, fitToWidth:1, fitToHeight:0 };
-    ws["!ref"]       = `A1:${ec(r, 8)}`;
-    XLSX.utils.book_append_sheet(wb, ws, "Service Breakdown");
-  })();
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // SHEET 4 — TOP CLIENTS
-  // ─────────────────────────────────────────────────────────────────────────
-  (() => {
-    const ws = {};
-    const merges = [];
-    let r = 0;
-
-    wc(ws, ec(r,0), "CDJ ACCOUNTING AND AUDITING OFFICE", STYLES.bigTitle);
-    merges.push({ s:{r,c:0}, e:{r,c:7} }); r++;
-    wc(ws, ec(r,0), `TOP CLIENTS BY REVENUE — ${periodLabel}`, STYLES.subTitle);
-    merges.push({ s:{r,c:0}, e:{r,c:7} }); r++;
-    wc(ws, ec(r,0), `Generated: ${new Date().toLocaleString("en-PH")}`, STYLES.meta);
-    merges.push({ s:{r,c:0}, e:{r,c:7} }); r++;
-    r++;
-
-    wc(ws, ec(r,0), "CLIENT REVENUE RANKING", STYLES.sectionHeader());
-    merges.push({ s:{r,c:0}, e:{r,c:7} }); r++;
-
-    const heads = ["RANK","CLIENT NAME","CLIENT TYPE","TRANSACTIONS","GROSS REVENUE","NET REVENUE","COLLECTED","OUTSTANDING"];
-    const hBg   = [P.darkGreen, P.darkGreen, P.darkGreen, P.darkGreen, P.darkGreen, P.maroon, P.blue, P.maroon];
-    heads.forEach((h, ci) => wc(ws, ec(r,ci), h, STYLES.colHead(hBg[ci])));
-    r++;
-
-    if (topClients.length === 0) {
-      wc(ws, ec(r,0), "No data for selected period.", STYLES.rowLabel());
-      merges.push({ s:{r,c:0}, e:{r,c:7} }); r++;
-    } else {
-      topClients.forEach((c2, i) => {
-        const bg = i % 2 === 0 ? P.white : P.stripe;
-        ws[ec(r,0)] = { v:i+1, t:"n", s:STYLES.num(bg, true, P.maroon), z:N_FMT };
-        wc(ws, ec(r,1), c2.ClientName || c2.ClientID || "—", STYLES.rowLabel(bg, true));
-        wc(ws, ec(r,2), c2.ClientType || "—",                STYLES.rowLabel(bg));
-        ws[ec(r,3)] = { v:parseInt(c2.TotalTransactions || 0), t:"n", s:STYLES.num(bg),                    z:N_FMT };
-        ws[ec(r,4)] = { v:parseFloat(c2.TotalGross      || 0), t:"n", s:STYLES.num(bg),                    z:C_FMT };
-        ws[ec(r,5)] = { v:parseFloat(c2.TotalNet        || 0), t:"n", s:STYLES.num(bg, true,  P.maroon),    z:C_FMT };
-        ws[ec(r,6)] = { v:parseFloat(c2.TotalCollected  || 0), t:"n", s:STYLES.num(bg, false, P.blue),      z:C_FMT };
-        ws[ec(r,7)] = { v:parseFloat(c2.TotalOutstanding|| 0), t:"n", s:STYLES.num(bg, false, P.red),       z:C_FMT };
-        r++;
-      });
-    }
-
-    r++;
-    wc(ws, ec(r,0), "* Ranked by Net Revenue (descending). Limited to top 10 clients for the selected period.", STYLES.footnote);
-    merges.push({ s:{r,c:0}, e:{r,c:7} });
-
-    ws["!cols"]      = [{ wch:6 },{ wch:40 },{ wch:18 },{ wch:14 },{ wch:20 },{ wch:20 },{ wch:18 },{ wch:18 }];
-    ws["!merges"]    = merges;
-    ws["!pageSetup"] = { paperSize:9, orientation:"landscape", fitToPage:true, fitToWidth:1, fitToHeight:0 };
-    ws["!ref"]       = `A1:${ec(r, 7)}`;
-    XLSX.utils.book_append_sheet(wb, ws, "Top Clients");
-  })();
-
-  const fname = `CDJ_Revenue_${year}${month ? `_${MONTHS[month-1].slice(0,3)}` : ""}.xlsx`;
-  XLSX.writeFile(wb, fname, { bookType:"xlsx", type:"binary", cellStyles:true });
+  const fname=`CDJ_Revenue_${year}${month?`_${MONTHS[month-1].slice(0,3)}`:""}.xlsx`;
+  XLSX.writeFile(wb,fname,{bookType:"xlsx",type:"binary",cellStyles:true});
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UI COMPONENTS
+// CHART TOOLTIP
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Chart tooltip
 const ChartTooltip = ({ active, payload, label }) => {
-  const theme = useTheme();
   if (!active || !payload?.length) return null;
   return (
-    <Box sx={{
-      bgcolor: theme.palette.background.paper,
-      border: `1px solid ${theme.palette.divider}`,
-      borderRadius: 1.5, p: 1.5, minWidth: 175,
-      boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-    }}>
-      <Typography sx={{ fontSize:"0.72rem", fontWeight:700, color:"text.primary",
-        borderBottom:`1px solid ${theme.palette.divider}`, pb:0.6, mb:0.6 }}>
+    <Paper elevation={3} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5, p: "8px 12px" }}>
+      <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={0.5}>
         {label}
       </Typography>
       {payload.map(p => (
-        <Stack key={p.name} direction="row" justifyContent="space-between" spacing={3} mb={0.2}>
-          <Stack direction="row" alignItems="center" spacing={0.5}>
-            <Box sx={{ width:8, height:8, borderRadius:"50%", bgcolor:p.color, flexShrink:0 }} />
-            <Typography sx={{ fontSize:"0.7rem", color:"text.secondary" }}>{p.name}</Typography>
-          </Stack>
-          <Typography sx={{ fontSize:"0.7rem", fontWeight:700, color:p.color }}>
-            {typeof p.value === "number" ? short(p.value) : p.value}
+        <Box key={p.name} sx={{ display: "flex", justifyContent: "space-between", gap: 3 }}>
+          <Typography variant="caption" color="text.secondary">{p.name}</Typography>
+          <Typography variant="caption" fontWeight={700} sx={{ color: p.color, fontFamily: "monospace" }}>
+            {short(p.value)}
           </Typography>
-        </Stack>
+        </Box>
       ))}
-    </Box>
-  );
-};
-
-// WooCommerce-style metric card
-const MetricCard = ({ label, value, sub, icon, color, loading, selected, onClick }) => {
-  const theme  = useTheme();
-  const isDark = theme.palette.mode === "dark";
-  return (
-    <Box onClick={onClick}
-      sx={{
-        flex:1, p:2.5, cursor: onClick ? "pointer" : "default",
-        bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#fff",
-        border: `1px solid ${selected ? color : theme.palette.divider}`,
-        borderBottom: `3px solid ${selected ? color : "transparent"}`,
-        borderRadius: 1.5,
-        transition: "all 0.15s ease",
-        "&:hover": onClick ? {
-          borderColor: color,
-          bgcolor: isDark ? `${color}10` : `${color}06`,
-        } : {},
-      }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-        <Box flex={1} minWidth={0}>
-          <Typography sx={{ fontSize:"0.7rem", color:"text.secondary", fontWeight:600,
-            letterSpacing:"0.04em", textTransform:"uppercase", mb:0.75 }}>
-            {label}
-          </Typography>
-          {loading
-            ? <Skeleton width={100} height={30} />
-            : <Typography sx={{ fontSize:"1.6rem", fontWeight:700, lineHeight:1, color:"text.primary", mb:0.5 }}>
-                {value}
-              </Typography>
-          }
-          {sub && (
-            <Typography sx={{ fontSize:"0.68rem", color:"text.secondary" }}>{sub}</Typography>
-          )}
-        </Box>
-        <Box sx={{
-          width:32, height:32, borderRadius:1,
-          bgcolor: `${color}15`,
-          display:"flex", alignItems:"center", justifyContent:"center",
-          color, "& svg":{ fontSize:"1rem" }, ml:1, flexShrink:0,
-        }}>
-          {icon}
-        </Box>
-      </Stack>
-    </Box>
+    </Paper>
   );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MAIN
+// MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 const RevenueReport = () => {
   const theme  = useTheme();
@@ -558,487 +203,829 @@ const RevenueReport = () => {
   const [chartMetric, setChartMetric] = useState("TotalNet");
 
   const C = {
-    maroon:  "#B03A2E",
-    gold:    "#C9A84C",
-    blue:    "#2E86C1",
-    dark:    "#7B241C",
-    teal:    "#17A589",
-    purple:  "#7D3C98",
+    maroon: "#B03A2E", gold:   "#C9A84C",
+    blue:   "#2E86C1", dark:   "#7B241C",
+    teal:   "#17A589", purple: "#7D3C98",
   };
 
   const METRIC_OPTS = [
-    { key:"TotalGross",       label:"Gross Revenue", color:C.maroon },
-    { key:"TotalNet",         label:"Net Revenue",   color:C.gold   },
-    { key:"TotalCollected",   label:"Collected",     color:C.blue   },
-    { key:"TotalOutstanding", label:"Outstanding",   color:C.dark   },
+    { key: "TotalGross",       label: "Gross",       labelFull: "Gross Revenue", color: C.maroon },
+    { key: "TotalNet",         label: "Net",         labelFull: "Net Revenue",   color: C.gold   },
+    { key: "TotalCollected",   label: "Collected",   labelFull: "Collected",     color: C.blue   },
+    { key: "TotalOutstanding", label: "Outstanding", labelFull: "Outstanding",   color: C.dark   },
   ];
 
   const RANK_COLORS = [C.maroon, C.gold, C.blue, C.teal, C.purple, "#E67E22", "#27AE60", "#2980B9"];
 
-  // Queries
-  const yearsQ   = useQuery({ queryKey:["rev-years"],              queryFn: async () => (await http.get("/revenue-available-years"))?.data?.data ?? [] });
-  const summaryQ = useQuery({ queryKey:["rev-summary",year,month], queryFn: async () => { const p = { year }; if (month) p.month = month; return (await http.get("/revenue-summary-totals", { params:p }))?.data?.data ?? {}; }});
-  const monthlyQ = useQuery({ queryKey:["rev-monthly",year],       queryFn: async () => (await http.get("/revenue-monthly", { params:{ year } }))?.data?.data ?? [] });
-  const serviceQ = useQuery({ queryKey:["rev-service",year,month], queryFn: async () => { const p = { year }; if (month) p.month = month; return (await http.get("/revenue-by-service", { params:p }))?.data?.data ?? []; }});
-  const clientQ  = useQuery({ queryKey:["rev-client",year,month],  queryFn: async () => { const p = { year, limit:10 }; if (month) p.month = month; return (await http.get("/revenue-by-client", { params:p }))?.data?.data ?? []; }});
+  // ── Queries ────────────────────────────────────────────────────────────────
+  const yearsQ = useQuery({
+    queryKey: ["rev-years"],
+    placeholderData: [],
+    queryFn: async () => {
+      try {
+        const r = await http.get("/revenue-available-years");
+        return Array.isArray(r?.data?.data) ? r.data.data : [];
+      } catch { return []; }
+    },
+  });
 
-  const summary    = summaryQ.data  || {};
-  const monthly12  = scaffold12(monthlyQ.data);
-  const services   = serviceQ.data  || [];
-  const topClients = clientQ.data   || [];
-  const years      = yearsQ.data    || [];
+  const summaryQ = useQuery({
+    queryKey: ["rev-summary", year, month],
+    placeholderData: {},
+    queryFn: async () => {
+      try {
+        const p = { year };
+        if (month) p.month = month;
+        const r = await http.get("/revenue-summary-totals", { params: p });
+        return (r?.data?.data && typeof r.data.data === "object") ? r.data.data : {};
+      } catch { return {}; }
+    },
+  });
+
+  const monthlyQ = useQuery({
+    queryKey: ["rev-monthly", year],
+    placeholderData: [],
+    queryFn: async () => {
+      try {
+        const r = await http.get("/revenue-monthly", { params: { year } });
+        return Array.isArray(r?.data?.data) ? r.data.data : [];
+      } catch { return []; }
+    },
+  });
+
+  const serviceQ = useQuery({
+    queryKey: ["rev-service", year, month],
+    placeholderData: [],
+    queryFn: async () => {
+      try {
+        const p = { year };
+        if (month) p.month = month;
+        const r = await http.get("/revenue-by-service", { params: p });
+        return Array.isArray(r?.data?.data) ? r.data.data : [];
+      } catch { return []; }
+    },
+  });
+
+  const clientQ = useQuery({
+    queryKey: ["rev-client", year, month],
+    placeholderData: [],
+    queryFn: async () => {
+      try {
+        const p = { year, limit: 10 };
+        if (month) p.month = month;
+        const r = await http.get("/revenue-by-client", { params: p });
+        return Array.isArray(r?.data?.data) ? r.data.data : [];
+      } catch { return []; }
+    },
+  });
+
+  // ── Hard guards: never trust .data directly ────────────────────────────────
+  const summary    = (summaryQ.data && typeof summaryQ.data === "object" && !Array.isArray(summaryQ.data))
+                       ? summaryQ.data : {};
+  const monthly12  = scaffold12(Array.isArray(monthlyQ.data) ? monthlyQ.data : []);
+  const services   = Array.isArray(serviceQ.data)  ? serviceQ.data  : [];
+  const topClients = Array.isArray(clientQ.data)   ? clientQ.data   : [];
+  const years      = Array.isArray(yearsQ.data)    ? yearsQ.data    : [];
   const isLoading  = summaryQ.isLoading;
-  const period     = month ? `${MONTHS[month-1]} ${year}` : `Full Year ${year}`;
+  const period     = month ? `${MONTHS[month-1]} ${year}` : `FY ${year}`;
 
-  // Pre-compute totals
+  // ── Derived totals ─────────────────────────────────────────────────────────
   const sT = {
-    gross:   services.reduce((a,s) => a + parseFloat(s.TotalGross      || 0), 0),
-    disc:    services.reduce((a,s) => a + parseFloat(s.TotalDiscount   || 0), 0),
-    net:     services.reduce((a,s) => a + parseFloat(s.TotalNet        || 0), 0),
-    coll:    services.reduce((a,s) => a + parseFloat(s.TotalCollected  || 0), 0),
-    out:     services.reduce((a,s) => a + parseFloat(s.TotalOutstanding|| 0), 0),
-    availed: services.reduce((a,s) => a + parseInt(s.TimesAvailed      || 0), 0),
-    qty:     services.reduce((a,s) => a + parseInt(s.TotalQty          || 0), 0),
+    gross:   services.reduce((a,s) => a + parseFloat(s.TotalGross       || 0), 0),
+    disc:    services.reduce((a,s) => a + parseFloat(s.TotalDiscount    || 0), 0),
+    net:     services.reduce((a,s) => a + parseFloat(s.TotalNet         || 0), 0),
+    coll:    services.reduce((a,s) => a + parseFloat(s.TotalCollected   || 0), 0),
+    out:     services.reduce((a,s) => a + parseFloat(s.TotalOutstanding || 0), 0),
+    availed: services.reduce((a,s) => a + parseInt(s.TimesAvailed       || 0), 0),
+    qty:     services.reduce((a,s) => a + parseInt(s.TotalQty           || 0), 0),
   };
   const mT = {
-    gross: monthly12.reduce((a,r) => a + r.TotalGross, 0),
-    net:   monthly12.reduce((a,r) => a + r.TotalNet, 0),
-    coll:  monthly12.reduce((a,r) => a + r.TotalCollected, 0),
-    out:   monthly12.reduce((a,r) => a + r.TotalOutstanding, 0),
+    gross: monthly12.reduce((a,r) => a + r.TotalGross,        0),
+    net:   monthly12.reduce((a,r) => a + r.TotalNet,          0),
+    coll:  monthly12.reduce((a,r) => a + r.TotalCollected,    0),
+    out:   monthly12.reduce((a,r) => a + r.TotalOutstanding,  0),
     txn:   monthly12.reduce((a,r) => a + r.TotalTransactions, 0),
   };
 
-  const activeMetric = METRIC_OPTS.find(m => m.key === chartMetric);
-  const gridColor    = isDark ? "#ffffff0d" : "#0000000a";
-  const axisProps    = { fontSize:11, fill: isDark ? "#888" : "#999" };
+  // ── Service client expansion ───────────────────────────────────────────────
+  const [expandedService, setExpandedService] = useState(null);
+  const [serviceClients,  setServiceClients]  = useState({});
 
-  // Shared table sx
-  const tableSx = {
-    width:"100%", borderCollapse:"collapse",
-    "& thead th": {
-      px:2, py:1.3, fontSize:"0.68rem", fontWeight:700, textAlign:"left",
-      letterSpacing:"0.05em", textTransform:"uppercase",
-      color: isDark ? "rgba(255,255,255,0.45)" : "#555",
-      bgcolor: isDark ? "rgba(255,255,255,0.04)" : "#F9F6F5",
-      borderBottom:`2px solid ${isDark ? "rgba(176,58,46,0.25)" : "rgba(176,58,46,0.18)"}`,
-      whiteSpace:"nowrap",
-    },
-    "& tbody td": {
-      px:2, py:1.1, fontSize:"0.8rem",
-      borderBottom:`1px solid ${isDark ? "rgba(255,255,255,0.055)" : "rgba(0,0,0,0.055)"}`,
-    },
-    "& tbody tr:last-child td": { borderBottom:"none" },
-    "& tbody tr:hover td": {
-      bgcolor: isDark ? "rgba(176,58,46,0.06)" : "rgba(176,58,46,0.03)",
-    },
-    "& tfoot td": {
-      px:2, py:1.25, fontSize:"0.8rem", fontWeight:800,
-      bgcolor: isDark ? "rgba(176,58,46,0.1)" : "rgba(176,58,46,0.05)",
-      borderTop:`2px solid ${isDark ? "rgba(176,58,46,0.35)" : "rgba(176,58,46,0.2)"}`,
-    },
+  const toggleServiceExpand = async (serviceId) => {
+    if (expandedService === serviceId) { setExpandedService(null); return; }
+    setExpandedService(serviceId);
+    if (serviceClients[serviceId]) return;
+    setServiceClients(prev => ({ ...prev, [serviceId]: { loading: true, data: [] } }));
+    try {
+      const p = { year, serviceid: serviceId };
+      if (month) p.month = month;
+      const res = await http.get("/revenue-by-service-clients", { params: p });
+      const data = Array.isArray(res?.data?.data) ? res.data.data : [];
+      setServiceClients(prev => ({ ...prev, [serviceId]: { loading: false, data } }));
+    } catch {
+      setServiceClients(prev => ({ ...prev, [serviceId]: { loading: false, data: [] } }));
+    }
   };
 
-  const amtTd = (val, color, bold = false) => (
-    <td style={{ textAlign:"right", fontWeight:bold ? 700 : 400, color: color || (isDark ? "#e0e0e0" : "#2c3e50") }}>
-      {fmt(val)}
-    </td>
+  const activeMetric = METRIC_OPTS.find(m => m.key === chartMetric);
+  const gridColor    = isDark ? "#ffffff0a" : "#00000008";
+  const axisProps    = { fontSize: 9, fill: isDark ? "#666" : "#aaa" };
+  const collRate     = parseFloat(summary.TotalNet) > 0
+    ? ((parseFloat(summary.TotalCollected) / parseFloat(summary.TotalNet)) * 100).toFixed(1)
+    : 0;
+
+  // Shared table style tokens
+  const headerSx = {
+    fontWeight: "bold", fontSize: "0.78rem", whiteSpace: "nowrap",
+    px: 1.5, py: 1.2,
+    backgroundColor: "action.hover",
+    color: "text.secondary",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    borderBottom: "2px solid",
+    borderColor: "divider",
+  };
+  const cellSx = {
+    fontSize: "0.82rem", whiteSpace: "nowrap",
+    px: 1.5, py: 1,
+    borderBottom: "1px solid",
+    borderColor: "divider",
+  };
+  const footerSx = {
+    fontSize: "0.82rem", fontWeight: "bold", whiteSpace: "nowrap",
+    px: 1.5, py: 1,
+    backgroundColor: isDark ? alpha("#fff", 0.04) : alpha("#000", 0.03),
+    borderTop: "2px solid",
+    borderColor: "divider",
+    borderBottom: "none",
+  };
+
+  const discColor = isDark ? "#e57373" : "#c0392b";
+  const netColor  = isDark ? "#d4a017" : "#7a6020";
+  const collColor = isDark ? "#5dade2" : "#1a5276";
+  const outColor  = isDark ? "#e08070" : "#7b1d14";
+
+  const SkeletonRows = ({ rows, cols }) =>
+    [...Array(rows)].map((_, i) => (
+      <TableRow key={i} sx={{ backgroundColor: i % 2 !== 0 ? "action.hover" : "transparent" }}>
+        {[...Array(cols)].map((_, j) => (
+          <TableCell key={j} sx={cellSx}><Skeleton variant="text" width="80%" /></TableCell>
+        ))}
+      </TableRow>
+    ));
+
+  const EmptyRow = ({ cols, message = "No data for selected period" }) => (
+    <TableRow>
+      <TableCell colSpan={cols} align="center"
+        sx={{ py: 4, color: "text.secondary", fontSize: "0.82rem", border: "none" }}>
+        {message}
+      </TableCell>
+    </TableRow>
   );
 
   return (
-    <Box sx={{ p:{ xs:2, md:3 }, maxWidth:1440, mx:"auto",
-      bgcolor: isDark ? "transparent" : "#F8F7F6" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
 
-      {/* ════════════════════════════════════════════════════════════════════
-          HEADER
-      ════════════════════════════════════════════════════════════════════ */}
-      <Stack direction={{ xs:"column", sm:"row" }}
-        justifyContent="space-between" alignItems={{ sm:"center" }} gap={2} mb={3}>
-        <Box>
-          <Typography sx={{ fontWeight:700, fontSize:{ xs:"1.2rem", md:"1.35rem" }, color:"text.primary", lineHeight:1.1 }}>
-            Revenue
-          </Typography>
-          <Typography sx={{ fontSize:"0.72rem", color:"text.secondary", mt:0.25 }}>
-            CDJ Accounting & Auditing Office &nbsp;·&nbsp; {period}
-          </Typography>
-        </Box>
-
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Box sx={{
-            display:"flex", alignItems:"center", gap:1,
-            bgcolor: isDark ? "rgba(255,255,255,0.05)" : "#fff",
-            border:`1px solid ${theme.palette.divider}`,
-            borderRadius:1.5, px:1.5, py:0.6,
-          }}>
-            <FormControl variant="standard" size="small" sx={{
-              minWidth:70,
-              "& .MuiInput-root":{ fontSize:"0.78rem" },
-              "& .MuiInput-root::before":{ display:"none" },
-              "& .MuiInput-root::after":{ display:"none" },
-            }}>
-              <Select value={year} onChange={e => setYear(e.target.value)} disableUnderline
-                sx={{ fontSize:"0.78rem", fontWeight:600 }}>
-                {years.length === 0 && (
-                  <MenuItem value={new Date().getFullYear()} sx={{ fontSize:"0.78rem" }}>
-                    {new Date().getFullYear()}
-                  </MenuItem>
-                )}
-                {years.map(y => (
-                  <MenuItem key={y} value={y} sx={{ fontSize:"0.78rem" }}>{y}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Box sx={{ width:1, height:18, bgcolor:"divider" }} />
-            <FormControl variant="standard" size="small" sx={{
-              minWidth:100,
-              "& .MuiInput-root":{ fontSize:"0.78rem" },
-              "& .MuiInput-root::before":{ display:"none" },
-              "& .MuiInput-root::after":{ display:"none" },
-            }}>
-              <Select value={month} onChange={e => setMonth(e.target.value)} disableUnderline
-                sx={{ fontSize:"0.78rem", color: month ? "text.primary" : "text.secondary" }}>
-                <MenuItem value="" sx={{ fontSize:"0.78rem" }}>All Months</MenuItem>
-                {MONTHS.map((m, i) => (
-                  <MenuItem key={i+1} value={i+1} sx={{ fontSize:"0.78rem" }}>{m}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+      {/* ── TOOLBAR ── */}
+      <Paper elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
+        <Box sx={{
+          p: 2,
+          borderBottom: "1px solid", borderColor: "divider",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          flexWrap: "wrap", gap: 1.5,
+        }}>
+          {/* Left: title + period chip */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <BarChartIcon fontSize="small" sx={{ color: "text.secondary" }} />
+            <Typography variant="subtitle2" fontWeight="bold">Revenue Report</Typography>
+            <Chip
+              label={period}
+              size="small" color="primary" variant="outlined"
+              sx={{ fontSize: "0.7rem", height: 20 }}
+            />
+            <Typography variant="caption" color="text.disabled" sx={{ ml: 0.5 }}>
+              CDJ Accounting &amp; Auditing Office
+            </Typography>
           </Box>
 
-          <Button variant="outlined" size="small"
-            disabled={summaryQ.isLoading || monthlyQ.isLoading || serviceQ.isLoading || clientQ.isLoading}
-            onClick={() => exportToExcel({ year, month, summary, monthly12, services, topClients })}
-            sx={{
-              borderColor:C.maroon, color:C.maroon, fontWeight:700, textTransform:"none",
-              borderRadius:1.5, px:2, fontSize:"0.75rem",
-              "&:hover":{ borderColor:C.dark, color:C.dark, bgcolor:`${C.maroon}08` },
+          {/* Right: period picker + export */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box sx={{
+              display: "flex", alignItems: "center",
+              bgcolor: "background.paper",
+              border: "1px solid", borderColor: "divider",
+              borderRadius: 1, overflow: "hidden", height: 32,
             }}>
-            ↓ Export Excel
-          </Button>
-        </Stack>
-      </Stack>
+              <Select
+                value={year}
+                onChange={e => { setYear(e.target.value); setExpandedService(null); setServiceClients({}); }}
+                variant="standard" disableUnderline
+                sx={{ fontSize: "0.78rem", fontWeight: 700, px: 1.25, height: 32, "& .MuiSelect-select": { py: 0 } }}
+              >
+                {(years.length === 0 ? [new Date().getFullYear()] : years).map(y => (
+                  <MenuItem key={y} value={y} sx={{ fontSize: "0.78rem" }}>{y}</MenuItem>
+                ))}
+              </Select>
+              <Box sx={{ width: "1px", height: 18, bgcolor: "divider" }} />
+              <Select
+                value={month}
+                onChange={e => { setMonth(e.target.value); setExpandedService(null); setServiceClients({}); }}
+                variant="standard" disableUnderline
+                sx={{ fontSize: "0.78rem", px: 1.25, height: 32, color: month ? "text.primary" : "text.secondary", "& .MuiSelect-select": { py: 0 } }}
+              >
+                <MenuItem value="" sx={{ fontSize: "0.78rem" }}>All Months</MenuItem>
+                {MONTHS.map((m, i) => (
+                  <MenuItem key={i+1} value={i+1} sx={{ fontSize: "0.78rem" }}>{m}</MenuItem>
+                ))}
+              </Select>
+            </Box>
 
-      {/* ════════════════════════════════════════════════════════════════════
-          METRIC CARDS
-      ════════════════════════════════════════════════════════════════════ */}
-      <Box sx={{
-        display:"grid",
-        gridTemplateColumns:{ xs:"1fr 1fr", sm:"repeat(3,1fr)", lg:"repeat(6,1fr)" },
-        gap:1.5, mb:3,
-      }}>
-        {[
-          { label:"Gross Revenue",  value:fmt(summary.TotalGross),       sub:`Period: ${period}`,                                    icon:<TrendingUpIcon/>,           color:C.maroon, metric:"TotalGross"       },
-          { label:"Net Revenue",    value:fmt(summary.TotalNet),         sub:`After discounts`,                                      icon:<TrendingUpIcon/>,           color:C.gold,   metric:"TotalNet"         },
-          { label:"Collected",      value:fmt(summary.TotalCollected),   sub:`Rate: ${pct(summary.TotalCollected, summary.TotalNet)}`,icon:<PaidIcon/>,                 color:C.blue,   metric:"TotalCollected"   },
-          { label:"Outstanding",    value:fmt(summary.TotalOutstanding), sub:`Discount: ${fmt(summary.TotalDiscount)}`,              icon:<AccountBalanceWalletIcon/>, color:C.dark,   metric:"TotalOutstanding" },
-          { label:"Transactions",   value:summary.TotalTransactions ?? "—", sub:`Total invoices`,                                   icon:<ReceiptLongIcon/>,          color:C.teal,   metric:null               },
-          { label:"Unique Clients", value:summary.UniqueClients ?? "—",     sub:`Active this ${month ? MONTHS[month-1] : "year"}`,  icon:<GroupIcon/>,                color:C.purple, metric:null               },
-        ].map(card => (
-          <MetricCard key={card.label} {...card}
-            loading={isLoading}
-            selected={card.metric === chartMetric}
-            onClick={card.metric ? () => { setChartMetric(card.metric); setActiveTab(0); } : undefined}
-          />
-        ))}
-      </Box>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<FileDownloadOutlinedIcon />}
+              disabled={summaryQ.isLoading || monthlyQ.isLoading || serviceQ.isLoading || clientQ.isLoading}
+              onClick={() => exportToExcel({ year, month, summary, monthly12, services, topClients })}
+              sx={{ height: 32, fontSize: "0.75rem", fontWeight: 600, textTransform: "none", borderRadius: 1 }}
+            >
+              Export Excel
+            </Button>
+          </Box>
+        </Box>
 
-      {/* ════════════════════════════════════════════════════════════════════
-          TABS
-      ════════════════════════════════════════════════════════════════════ */}
-      <Box sx={{
-        bgcolor: isDark ? "rgba(255,255,255,0.02)" : "#fff",
-        border:`1px solid ${theme.palette.divider}`, borderRadius:2,
-        overflow:"hidden",
-      }}>
+        {/* ── KPI CARDS ROW ── */}
+        <Box sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3,1fr)", lg: "repeat(6,1fr)" },
+          borderBottom: "1px solid", borderColor: "divider",
+        }}>
+          {[
+            { label: "Gross Revenue",  value: short(summary.TotalGross),       sub: `FY ${year}`,                                           icon: <TrendingUpIcon fontSize="small"/>,          color: C.maroon, metric: "TotalGross"       },
+            { label: "Net Revenue",    value: short(summary.TotalNet),         sub: "After discounts",                                      icon: <TrendingUpIcon fontSize="small"/>,          color: C.gold,   metric: "TotalNet"         },
+            { label: "Collected",      value: short(summary.TotalCollected),   sub: `${pct(summary.TotalCollected, summary.TotalNet)} rate`, icon: <PaidIcon fontSize="small"/>,                color: C.blue,   metric: "TotalCollected"   },
+            { label: "Outstanding",    value: short(summary.TotalOutstanding), sub: `Disc: ${short(summary.TotalDiscount)}`,                icon: <AccountBalanceWalletIcon fontSize="small"/>, color: C.dark,   metric: "TotalOutstanding" },
+            { label: "Transactions",   value: summary.TotalTransactions ?? "—",sub: "Total invoices",                                       icon: <ReceiptLongIcon fontSize="small"/>,         color: C.teal,   metric: null               },
+            { label: "Unique Clients", value: summary.UniqueClients ?? "—",    sub: `This ${month ? MONTHS[month-1] : "year"}`,             icon: <GroupIcon fontSize="small"/>,               color: C.purple, metric: null               },
+          ].map((card, idx, arr) => (
+            <Box
+              key={card.label}
+              onClick={card.metric ? () => { setChartMetric(card.metric); setActiveTab(0); } : undefined}
+              sx={{
+                px: 2, py: 1.5,
+                cursor: card.metric ? "pointer" : "default",
+                borderRight: idx < arr.length - 1 ? "1px solid" : "none",
+                borderColor: "divider",
+                borderLeft: `3px solid ${card.metric === chartMetric ? card.color : "transparent"}`,
+                bgcolor: card.metric === chartMetric
+                  ? (isDark ? alpha(card.color, 0.1) : alpha(card.color, 0.05))
+                  : "transparent",
+                transition: "background-color 0.12s, border-left-color 0.12s",
+                "&:hover": card.metric ? {
+                  bgcolor: isDark ? alpha(card.color, 0.08) : alpha(card.color, 0.04),
+                  borderLeftColor: card.color,
+                } : {},
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.5 }}>
+                <Box sx={{ color: card.color }}>{card.icon}</Box>
+                <Typography sx={{
+                  fontSize: "0.65rem", fontWeight: 700,
+                  textTransform: "uppercase", letterSpacing: "0.06em",
+                  color: "text.secondary",
+                }}>
+                  {card.label}
+                </Typography>
+              </Box>
+              {isLoading
+                ? <Skeleton width={72} height={22} />
+                : <Typography sx={{ fontSize: "1rem", fontWeight: 800, color: "text.primary", fontFamily: "monospace", lineHeight: 1.2 }}>
+                    {card.value}
+                  </Typography>
+              }
+              {card.sub && !isLoading && (
+                <Typography sx={{ fontSize: "0.65rem", color: "text.disabled", mt: "2px" }}>{card.sub}</Typography>
+              )}
+            </Box>
+          ))}
+        </Box>
+      </Paper>
+
+      {/* ── MAIN PANEL ── */}
+      <Paper elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
+
         {/* Tab bar */}
         <Box sx={{
-          borderBottom:`1px solid ${theme.palette.divider}`,
-          bgcolor: isDark ? "rgba(255,255,255,0.03)" : "#FDFAF9", px:2,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          borderBottom: "1px solid", borderColor: "divider",
+          px: 2,
+          backgroundColor: "action.hover",
         }}>
-          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}
+          <Tabs
+            value={activeTab}
+            onChange={(_, v) => setActiveTab(v)}
             sx={{
-              minHeight:42,
-              "& .MuiTab-root":{ minHeight:42, fontSize:"0.75rem", fontWeight:600, textTransform:"none", px:2, py:0, color:"text.secondary" },
-              "& .Mui-selected":{ color:`${C.maroon} !important` },
-              "& .MuiTabs-indicator":{ backgroundColor:C.maroon, height:2 },
-            }}>
+              minHeight: 40,
+              "& .MuiTab-root": {
+                minHeight: 40, fontSize: "0.78rem", fontWeight: 600,
+                textTransform: "none", px: 2, py: 0, minWidth: "auto",
+                color: "text.secondary",
+              },
+              "& .Mui-selected": { color: `${C.maroon} !important` },
+              "& .MuiTabs-indicator": { backgroundColor: C.maroon, height: 2 },
+            }}
+          >
             <Tab label="Chart" />
             <Tab label="Monthly" />
             <Tab label="By Service" />
             <Tab label="By Client" />
           </Tabs>
+
+          {/* Summary badges */}
+          <Box sx={{ display: { xs: "none", md: "flex" }, gap: 0.75 }}>
+            {!isLoading && [
+              { label: `Net: ${short(summary.TotalNet)}`,        color: C.gold   },
+              { label: `Coll. ${collRate}%`,                      color: C.blue   },
+              { label: `Disc: ${short(summary.TotalDiscount)}`,  color: C.dark   },
+            ].map(c => (
+              <Chip
+                key={c.label}
+                label={c.label}
+                size="small"
+                variant="outlined"
+                sx={{
+                  fontSize: "0.65rem", height: 20,
+                  borderColor: alpha(c.color, 0.4),
+                  color: c.color,
+                  bgcolor: alpha(c.color, 0.07),
+                  fontWeight: 700,
+                }}
+              />
+            ))}
+          </Box>
         </Box>
 
-        {/* ── TAB 0: AREA CHART ── */}
+        {/* ── TAB 0: CHART ── */}
         {activeTab === 0 && (
-          <Box p={2.5}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography sx={{ fontSize:"0.85rem", fontWeight:700, color:"text.primary" }}>
-                {activeMetric?.label} — {year}
-              </Typography>
-              <Stack direction="row" spacing={0.5}>
+          <Box sx={{ p: 2.5 }}>
+            {/* Chart header */}
+            <Box sx={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              mb: 2, pb: 1.5, borderBottom: "1px solid", borderColor: "divider",
+            }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ width: 3, height: 16, borderRadius: 2, backgroundColor: activeMetric?.color }} />
+                <Typography variant="subtitle2" fontWeight="bold">
+                  {activeMetric?.labelFull} — Monthly Trend {year}
+                </Typography>
+              </Box>
+              <Box sx={{ display: "flex", gap: 0.5 }}>
                 {METRIC_OPTS.map(m => (
-                  <Box key={m.key}
+                  <Chip
+                    key={m.key}
+                    label={m.label}
+                    size="small"
                     onClick={() => setChartMetric(m.key)}
+                    variant={chartMetric === m.key ? "filled" : "outlined"}
                     sx={{
-                      px:1.5, py:0.4, borderRadius:1, fontSize:"0.7rem", fontWeight:600,
-                      cursor:"pointer", border:"1px solid",
-                      borderColor: chartMetric === m.key ? m.color : "divider",
-                      color:       chartMetric === m.key ? m.color : "text.secondary",
-                      bgcolor:     chartMetric === m.key ? `${m.color}12` : "transparent",
-                      transition:"all 0.12s",
-                    }}>
-                    {m.label}
-                  </Box>
+                      fontSize: "0.68rem", height: 22, fontWeight: 700,
+                      cursor: "pointer",
+                      borderColor: alpha(m.color, chartMetric === m.key ? 1 : 0.35),
+                      color: chartMetric === m.key ? "#fff" : m.color,
+                      bgcolor: chartMetric === m.key ? m.color : alpha(m.color, 0.06),
+                      "&:hover": { bgcolor: chartMetric === m.key ? m.color : alpha(m.color, 0.12) },
+                    }}
+                  />
                 ))}
-              </Stack>
-            </Stack>
+              </Box>
+            </Box>
 
             {monthlyQ.isLoading
-              ? <Skeleton variant="rectangular" height={260} sx={{ borderRadius:1 }} />
+              ? <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1.5 }} />
               : (
-                <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={monthly12} margin={{ top:4, right:16, bottom:0, left:0 }}>
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={monthly12} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                     <defs>
-                      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id="aGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%"  stopColor={activeMetric?.color} stopOpacity={0.2} />
-                        <stop offset="95%" stopColor={activeMetric?.color} stopOpacity={0} />
+                        <stop offset="95%" stopColor={activeMetric?.color} stopOpacity={0}   />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                    <CartesianGrid strokeDasharray="2 4" stroke={gridColor} />
                     <XAxis dataKey="month" tick={axisProps} tickLine={false} axisLine={false} />
-                    <YAxis tickFormatter={short} tick={axisProps} tickLine={false} axisLine={false} width={60} />
-                    <Tooltip content={<ChartTooltip />} />
+                    <YAxis tickFormatter={short} tick={axisProps} tickLine={false} axisLine={false} width={54} />
+                    <RechartsTooltip content={<ChartTooltip />} />
                     <Area
-                      type="monotone"
-                      dataKey={chartMetric}
-                      name={activeMetric?.label}
-                      stroke={activeMetric?.color}
-                      strokeWidth={2.5}
-                      fill="url(#areaGrad)"
-                      dot={false}
-                      activeDot={{ r:5, strokeWidth:0, fill:activeMetric?.color }}
+                      type="monotone" dataKey={chartMetric} name={activeMetric?.labelFull}
+                      stroke={activeMetric?.color} strokeWidth={2} fill="url(#aGrad)"
+                      dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: activeMetric?.color }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
               )
             }
 
-            <Box sx={{ mt:2, pt:1.5, borderTop:`1px solid ${theme.palette.divider}` }}>
-              <Stack direction="row" alignItems="center" spacing={1.5}>
-                <Box sx={{ width:14, height:14, borderRadius:0.5, bgcolor:activeMetric?.color, flexShrink:0 }} />
-                <Typography sx={{ fontSize:"0.75rem", color:"text.secondary" }}>
-                  {activeMetric?.label} — {period}
-                </Typography>
-                <Box sx={{ flex:1 }} />
-                <Typography sx={{ fontSize:"0.8rem", fontWeight:700, color:"text.primary" }}>
-                  {summaryQ.isLoading ? "—" : fmt(summary[chartMetric])}
-                </Typography>
-              </Stack>
+            {/* Chart footer summary */}
+            <Box sx={{
+              display: "flex", alignItems: "center", gap: 1.5,
+              mt: 1.5, pt: 1.5, borderTop: "1px solid", borderColor: "divider",
+            }}>
+              <Box sx={{ width: 12, height: 12, borderRadius: "3px", bgcolor: activeMetric?.color, flexShrink: 0 }} />
+              <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                {activeMetric?.labelFull} · {period}
+              </Typography>
+              <Typography sx={{ fontSize: "0.9rem", fontWeight: 800, fontFamily: "monospace", color: "text.primary" }}>
+                {isLoading ? "—" : fmt(summary[chartMetric])}
+              </Typography>
             </Box>
           </Box>
         )}
 
-        {/* ── TAB 1: MONTHLY TABLE ── */}
+        {/* ── TAB 1: MONTHLY ── */}
         {activeTab === 1 && (
-          <Box sx={{ overflow:"auto" }}>
-            <Box component="table" sx={tableSx}>
-              <thead>
-                <tr>
-                  <th>Month</th>
-                  <th style={{ textAlign:"right" }}>Gross Revenue</th>
-                  <th style={{ textAlign:"right", color: isDark ? "#e57373" : "#c0392b" }}>Discounts</th>
-                  <th style={{ textAlign:"right", color: isDark ? "#d4a017" : "#7a6020" }}>Net Revenue</th>
-                  <th style={{ textAlign:"right", color: isDark ? "#5dade2" : "#1a5276" }}>Collected</th>
-                  <th style={{ textAlign:"right", color: isDark ? "#e08070" : "#7b1d14" }}>Outstanding</th>
-                  <th style={{ textAlign:"right" }}>Transactions</th>
-                </tr>
-              </thead>
-              <tbody>
+          <TableContainer sx={{ overflowX: "auto" }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  {[
+                    { label: "Mo.",         align: "left"  },
+                    { label: "Gross",       align: "right" },
+                    { label: "Disc.",       align: "right", color: discColor },
+                    { label: "Net",         align: "right", color: netColor  },
+                    { label: "Collected",   align: "right", color: collColor },
+                    { label: "Outstanding", align: "right", color: outColor  },
+                    { label: "Txn",         align: "right" },
+                  ].map(h => (
+                    <TableCell key={h.label} align={h.align || "left"}
+                      sx={{ ...headerSx, color: h.color || "text.secondary" }}>
+                      {h.label}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {monthlyQ.isLoading
-                  ? [...Array(12)].map((_, i) => (
-                      <tr key={i}>
-                        {[...Array(7)].map((_, j) => (
-                          <td key={j}><Skeleton variant="text" /></td>
-                        ))}
-                      </tr>
-                    ))
-                  : monthly12.map(row => {
+                  ? <SkeletonRows rows={12} cols={7} />
+                  : monthly12.map((row, i) => {
                       const has  = row.TotalGross > 0;
                       const disc = row.TotalGross - row.TotalNet;
                       return (
-                        <tr key={row.month} style={{ opacity: has ? 1 : 0.3 }}>
-                          <td style={{ fontWeight:600 }}>{row.month}</td>
-                          {amtTd(row.TotalGross, null)}
-                          {amtTd(disc, isDark ? "#e57373" : "#c0392b")}
-                          {amtTd(row.TotalNet, isDark ? "#d4a017" : "#7a6020", true)}
-                          {amtTd(row.TotalCollected, isDark ? "#5dade2" : "#1a5276")}
-                          {amtTd(row.TotalOutstanding, isDark ? "#e08070" : "#7b1d14")}
-                          <td style={{ textAlign:"right" }}>{row.TotalTransactions}</td>
-                        </tr>
+                        <TableRow key={row.month} hover
+                          sx={{
+                            opacity: has ? 1 : 0.4,
+                            backgroundColor: i % 2 !== 0 ? "action.hover" : "transparent",
+                            "&:hover": { backgroundColor: "action.selected" },
+                          }}>
+                          <TableCell sx={{ ...cellSx, fontWeight: "bold" }}>{row.month}</TableCell>
+                          <TableCell align="right" sx={cellSx}>
+                            <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{fmt(row.TotalGross)}</Typography>
+                          </TableCell>
+                          <TableCell align="right" sx={cellSx}>
+                            <Typography variant="body2" sx={{ fontFamily: "monospace", color: discColor }}>{fmt(disc)}</Typography>
+                          </TableCell>
+                          <TableCell align="right" sx={cellSx}>
+                            <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: netColor }}>{fmt(row.TotalNet)}</Typography>
+                          </TableCell>
+                          <TableCell align="right" sx={cellSx}>
+                            <Typography variant="body2" sx={{ fontFamily: "monospace", color: collColor }}>{fmt(row.TotalCollected)}</Typography>
+                          </TableCell>
+                          <TableCell align="right" sx={cellSx}>
+                            <Typography variant="body2" sx={{ fontFamily: "monospace", color: outColor }}>{fmt(row.TotalOutstanding)}</Typography>
+                          </TableCell>
+                          <TableCell align="right" sx={{ ...cellSx, color: "text.secondary" }}>{row.TotalTransactions}</TableCell>
+                        </TableRow>
                       );
                     })
                 }
-              </tbody>
+              </TableBody>
               {!monthlyQ.isLoading && (
-                <tfoot>
-                  <tr>
-                    <td>TOTAL</td>
-                    {amtTd(mT.gross, null)}
-                    {amtTd(mT.gross - mT.net, isDark ? "#e57373" : "#c0392b")}
-                    {amtTd(mT.net,   isDark ? "#d4a017" : "#7a6020")}
-                    {amtTd(mT.coll,  isDark ? "#5dade2" : "#1a5276")}
-                    {amtTd(mT.out,   isDark ? "#e08070" : "#7b1d14")}
-                    <td style={{ textAlign:"right" }}>{mT.txn}</td>
-                  </tr>
-                </tfoot>
+                <TableFooter>
+                  <TableRow sx={{ backgroundColor: isDark ? alpha("#fff", 0.04) : alpha("#000", 0.03) }}>
+                    <TableCell align="left"  sx={footerSx}>Total</TableCell>
+                    <TableCell align="right" sx={footerSx}>
+                      <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace" }}>{fmt(mT.gross)}</Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={footerSx}>
+                      <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: discColor }}>{fmt(mT.gross - mT.net)}</Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={footerSx}>
+                      <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: netColor }}>{fmt(mT.net)}</Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={footerSx}>
+                      <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: collColor }}>{fmt(mT.coll)}</Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={footerSx}>
+                      <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: outColor }}>{fmt(mT.out)}</Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={footerSx}>{mT.txn}</TableCell>
+                  </TableRow>
+                </TableFooter>
               )}
-            </Box>
-          </Box>
+            </Table>
+          </TableContainer>
         )}
 
-        {/* ── TAB 2: BY SERVICE ── */}
+        {/* ── TAB 2: BY SERVICE (with expandable client breakdown) ── */}
         {activeTab === 2 && (
-          <Box sx={{ overflow:"auto" }}>
-            <Box component="table" sx={tableSx}>
-              <thead>
-                <tr>
-                  <th style={{ width:32 }}>#</th>
-                  <th>Service Name</th>
-                  <th style={{ textAlign:"right" }}>Availed</th>
-                  <th style={{ textAlign:"right" }}>Qty</th>
-                  <th style={{ textAlign:"right" }}>Gross</th>
-                  <th style={{ textAlign:"right", color: isDark ? "#e57373" : "#c0392b" }}>Discount</th>
-                  <th style={{ textAlign:"right", color: isDark ? "#d4a017" : "#7a6020" }}>Net Revenue</th>
-                  <th style={{ textAlign:"right", color: isDark ? "#5dade2" : "#1a5276" }}>Collected</th>
-                  <th style={{ textAlign:"right", color: isDark ? "#e08070" : "#7b1d14" }}>Outstanding</th>
-                </tr>
-              </thead>
-              <tbody>
+          <TableContainer sx={{ overflowX: "auto" }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ ...headerSx, width: 36, p: 0 }} />
+                  {[
+                    { label: "#",           align: "left"  },
+                    { label: "Service",     align: "left"  },
+                    { label: "Availed",     align: "right" },
+                    { label: "Qty",         align: "right" },
+                    { label: "Gross",       align: "right" },
+                    { label: "Disc.",       align: "right", color: discColor },
+                    { label: "Net",         align: "right", color: netColor  },
+                    { label: "Collected",   align: "right", color: collColor },
+                    { label: "Outstanding", align: "right", color: outColor  },
+                  ].map(h => (
+                    <TableCell key={h.label} align={h.align || "left"}
+                      sx={{ ...headerSx, color: h.color || "text.secondary" }}>
+                      {h.label}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {serviceQ.isLoading
-                  ? [...Array(6)].map((_, i) => (
-                      <tr key={i}>
-                        {[...Array(9)].map((_, j) => (
-                          <td key={j}><Skeleton variant="text" /></td>
-                        ))}
-                      </tr>
-                    ))
+                  ? <SkeletonRows rows={6} cols={10} />
                   : services.length === 0
-                  ? (
-                      <tr>
-                        <td colSpan={9} style={{ textAlign:"center", padding:"32px 0", color:theme.palette.text.secondary }}>
-                          No data for selected period
-                        </td>
-                      </tr>
-                    )
-                  : services.map((s, i) => (
-                      <tr key={s.ServiceID ?? i}>
-                        <td style={{ color:theme.palette.text.disabled, fontSize:"0.7rem" }}>{i+1}</td>
-                        <td style={{ fontWeight:600 }}>{s.ServiceName}</td>
-                        <td style={{ textAlign:"right" }}>{s.TimesAvailed ?? 0}</td>
-                        <td style={{ textAlign:"right" }}>{s.TotalQty ?? 0}</td>
-                        {amtTd(s.TotalGross,       null)}
-                        {amtTd(s.TotalDiscount,    isDark ? "#e57373" : "#c0392b")}
-                        {amtTd(s.TotalNet,         isDark ? "#d4a017" : "#7a6020", true)}
-                        {amtTd(s.TotalCollected,   isDark ? "#5dade2" : "#1a5276")}
-                        {amtTd(s.TotalOutstanding, isDark ? "#e08070" : "#7b1d14")}
-                      </tr>
-                    ))
+                  ? <EmptyRow cols={10} />
+                  : services.map((s, i) => {
+                      const svcId    = s.ServiceID ?? i;
+                      const isOpen   = expandedService === svcId;
+                      const svcState = serviceClients[svcId];
+                      const rowBg    = i % 2 !== 0 ? "action.hover" : "transparent";
+                      return (
+                        // ✅ FIX: Use React.Fragment with key instead of bare <>
+                        // This ensures React correctly tracks children and prevents
+                        // the Tooltip from receiving undefined children.
+                        <React.Fragment key={`svc-frag-${svcId}`}>
+                          {/* ── Main service row ── */}
+                          <TableRow
+                            sx={{
+                              backgroundColor: isOpen
+                                ? (isDark ? alpha(C.maroon, 0.1) : alpha(C.maroon, 0.05))
+                                : rowBg,
+                              "&:hover": { backgroundColor: isOpen ? alpha(C.maroon, 0.08) : "action.selected" },
+                              cursor: "pointer",
+                            }}
+                            onClick={() => toggleServiceExpand(svcId)}
+                          >
+                            <TableCell sx={{ ...cellSx, p: 0, width: 36, textAlign: "center" }}>
+                              <Tooltip title={isOpen ? "Hide clients" : "Show clients"}>
+                                <IconButton size="small" sx={{ color: isOpen ? C.maroon : "text.disabled" }}>
+                                  {isOpen
+                                    ? <KeyboardArrowDownIcon fontSize="small" />
+                                    : <KeyboardArrowRightIcon fontSize="small" />
+                                  }
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                            <TableCell sx={{ ...cellSx, color: "text.disabled", fontSize: "0.72rem", width: 40, textAlign: "center" }}>{i+1}</TableCell>
+                            <TableCell sx={{ ...cellSx, fontWeight: "bold", color: isOpen ? C.maroon : "text.primary" }}>
+                              {s.ServiceName}
+                            </TableCell>
+                            <TableCell align="right" sx={{ ...cellSx, color: "text.secondary" }}>{s.TimesAvailed ?? 0}</TableCell>
+                            <TableCell align="right" sx={{ ...cellSx, color: "text.secondary" }}>{s.TotalQty ?? 0}</TableCell>
+                            <TableCell align="right" sx={cellSx}>
+                              <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{fmt(s.TotalGross)}</Typography>
+                            </TableCell>
+                            <TableCell align="right" sx={cellSx}>
+                              <Typography variant="body2" sx={{ fontFamily: "monospace", color: discColor }}>{fmt(s.TotalDiscount)}</Typography>
+                            </TableCell>
+                            <TableCell align="right" sx={cellSx}>
+                              <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: netColor }}>{fmt(s.TotalNet)}</Typography>
+                            </TableCell>
+                            <TableCell align="right" sx={cellSx}>
+                              <Typography variant="body2" sx={{ fontFamily: "monospace", color: collColor }}>{fmt(s.TotalCollected)}</Typography>
+                            </TableCell>
+                            <TableCell align="right" sx={cellSx}>
+                              <Typography variant="body2" sx={{ fontFamily: "monospace", color: outColor }}>{fmt(s.TotalOutstanding)}</Typography>
+                            </TableCell>
+                          </TableRow>
+
+                          {/* ── Expanded client sub-table ── */}
+                          <TableRow sx={{ backgroundColor: "transparent" }}>
+                            <TableCell colSpan={10} sx={{ p: 0, border: "none" }}>
+                              <Collapse in={isOpen} timeout="auto" unmountOnExit>
+                                <Box sx={{
+                                  mx: 2, my: 1,
+                                  border: "1px solid", borderColor: alpha(C.maroon, 0.25),
+                                  borderRadius: 1.5, overflow: "hidden",
+                                  backgroundColor: isDark ? alpha(C.maroon, 0.04) : alpha(C.maroon, 0.02),
+                                }}>
+                                  {/* Sub-table header */}
+                                  <Box sx={{
+                                    px: 1.5, py: 0.75,
+                                    display: "flex", alignItems: "center", gap: 1,
+                                    borderBottom: "1px solid", borderColor: alpha(C.maroon, 0.2),
+                                    backgroundColor: isDark ? alpha(C.maroon, 0.1) : alpha(C.maroon, 0.06),
+                                  }}>
+                                    <PeopleAltIcon sx={{ fontSize: "0.85rem", color: C.maroon }} />
+                                    <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: C.maroon, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                      Clients who availed — {s.ServiceName}
+                                    </Typography>
+                                    {svcState && !svcState.loading && (
+                                      <Chip
+                                        label={`${svcState.data.length} client${svcState.data.length !== 1 ? "s" : ""}`}
+                                        size="small" variant="outlined"
+                                        sx={{ fontSize: "0.62rem", height: 18, borderColor: alpha(C.maroon, 0.4), color: C.maroon, ml: "auto" }}
+                                      />
+                                    )}
+                                  </Box>
+
+                                  {/* Sub-table body */}
+                                  {svcState?.loading ? (
+                                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1, py: 2.5 }}>
+                                      <CircularProgress size={14} sx={{ color: C.maroon }} />
+                                      <Typography variant="caption" color="text.secondary">Loading clients…</Typography>
+                                    </Box>
+                                  ) : !svcState?.data?.length ? (
+                                    <Box sx={{ py: 2.5, textAlign: "center" }}>
+                                      <Typography variant="caption" color="text.secondary">No client data available.</Typography>
+                                    </Box>
+                                  ) : (
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow>
+                                          {[
+                                            { label: "#",           align: "left"  },
+                                            { label: "Client",      align: "left"  },
+                                            { label: "Type",        align: "left"  },
+                                            { label: "Txn",         align: "right" },
+                                            { label: "Gross",       align: "right" },
+                                            { label: "Disc.",       align: "right", color: discColor },
+                                            { label: "Net",         align: "right", color: netColor  },
+                                            { label: "Collected",   align: "right", color: collColor },
+                                            { label: "Outstanding", align: "right", color: outColor  },
+                                          ].map(h => (
+                                            <TableCell key={h.label} align={h.align || "left"} sx={{
+                                              fontSize: "0.68rem", fontWeight: 700,
+                                              textTransform: "uppercase", letterSpacing: "0.05em",
+                                              color: h.color || "text.secondary",
+                                              px: 1.5, py: 0.75,
+                                              backgroundColor: "transparent",
+                                              borderBottom: "1px solid", borderColor: alpha(C.maroon, 0.15),
+                                              whiteSpace: "nowrap",
+                                            }}>
+                                              {h.label}
+                                            </TableCell>
+                                          ))}
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {(svcState?.data ?? []).map((c, ci) => (
+                                          <TableRow key={c.ClientID ?? ci}
+                                            sx={{
+                                              backgroundColor: ci % 2 !== 0 ? alpha(C.maroon, 0.03) : "transparent",
+                                              "&:hover": { backgroundColor: alpha(C.maroon, 0.06) },
+                                            }}>
+                                            <TableCell sx={{ ...cellSx, color: "text.disabled", fontSize: "0.7rem", width: 36, textAlign: "center" }}>{ci + 1}</TableCell>
+                                            <TableCell sx={{ ...cellSx, fontWeight: "bold" }}>{c.ClientName || c.ClientID}</TableCell>
+                                            <TableCell sx={cellSx}>
+                                              {c.ClientType
+                                                ? <Chip label={c.ClientType} size="small" variant="outlined" sx={{ fontSize: "0.65rem", height: 18 }} />
+                                                : <Typography component="span" sx={{ fontSize: "0.78rem", color: "text.disabled" }}>—</Typography>
+                                              }
+                                            </TableCell>
+                                            <TableCell align="right" sx={{ ...cellSx, color: "text.secondary" }}>{c.TotalTransactions ?? 0}</TableCell>
+                                            <TableCell align="right" sx={cellSx}>
+                                              <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{fmt(c.TotalGross)}</Typography>
+                                            </TableCell>
+                                            <TableCell align="right" sx={cellSx}>
+                                              <Typography variant="body2" sx={{ fontFamily: "monospace", color: discColor }}>{fmt(c.TotalDiscount)}</Typography>
+                                            </TableCell>
+                                            <TableCell align="right" sx={cellSx}>
+                                              <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: netColor }}>{fmt(c.TotalNet)}</Typography>
+                                            </TableCell>
+                                            <TableCell align="right" sx={cellSx}>
+                                              <Typography variant="body2" sx={{ fontFamily: "monospace", color: collColor }}>{fmt(c.TotalCollected)}</Typography>
+                                            </TableCell>
+                                            <TableCell align="right" sx={cellSx}>
+                                              <Typography variant="body2" sx={{ fontFamily: "monospace", color: outColor }}>{fmt(c.TotalOutstanding)}</Typography>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  )}
+                                </Box>
+                              </Collapse>
+                            </TableCell>
+                          </TableRow>
+                        </React.Fragment>
+                      );
+                    })
                 }
-              </tbody>
+              </TableBody>
               {services.length > 0 && !serviceQ.isLoading && (
-                <tfoot>
-                  <tr>
-                    <td colSpan={2}>TOTAL</td>
-                    <td style={{ textAlign:"right" }}>{sT.availed}</td>
-                    <td style={{ textAlign:"right" }}>{sT.qty}</td>
-                    {amtTd(sT.gross, null)}
-                    {amtTd(sT.disc,  isDark ? "#e57373" : "#c0392b")}
-                    {amtTd(sT.net,   isDark ? "#d4a017" : "#7a6020")}
-                    {amtTd(sT.coll,  isDark ? "#5dade2" : "#1a5276")}
-                    {amtTd(sT.out,   isDark ? "#e08070" : "#7b1d14")}
-                  </tr>
-                </tfoot>
+                <TableFooter>
+                  <TableRow sx={{ backgroundColor: isDark ? alpha("#fff", 0.04) : alpha("#000", 0.03) }}>
+                    <TableCell sx={footerSx} />
+                    <TableCell sx={footerSx} />
+                    <TableCell align="left"  sx={footerSx}>Total</TableCell>
+                    <TableCell align="right" sx={footerSx}>{sT.availed}</TableCell>
+                    <TableCell align="right" sx={footerSx}>{sT.qty}</TableCell>
+                    <TableCell align="right" sx={footerSx}>
+                      <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace" }}>{fmt(sT.gross)}</Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={footerSx}>
+                      <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: discColor }}>{fmt(sT.disc)}</Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={footerSx}>
+                      <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: netColor }}>{fmt(sT.net)}</Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={footerSx}>
+                      <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: collColor }}>{fmt(sT.coll)}</Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={footerSx}>
+                      <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: outColor }}>{fmt(sT.out)}</Typography>
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
               )}
-            </Box>
-          </Box>
+            </Table>
+          </TableContainer>
         )}
 
         {/* ── TAB 3: BY CLIENT ── */}
         {activeTab === 3 && (
-          <Box sx={{ overflow:"auto" }}>
-            <Box component="table" sx={tableSx}>
-              <thead>
-                <tr>
-                  <th style={{ width:40 }}>Rank</th>
-                  <th>Client Name</th>
-                  <th>Type</th>
-                  <th style={{ textAlign:"right" }}>Transactions</th>
-                  <th style={{ textAlign:"right" }}>Gross</th>
-                  <th style={{ textAlign:"right", color: isDark ? "#d4a017" : "#7a6020" }}>Net Revenue</th>
-                  <th style={{ textAlign:"right", color: isDark ? "#5dade2" : "#1a5276" }}>Collected</th>
-                  <th style={{ textAlign:"right", color: isDark ? "#e08070" : "#7b1d14" }}>Outstanding</th>
-                </tr>
-              </thead>
-              <tbody>
+          <TableContainer sx={{ overflowX: "auto" }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  {[
+                    { label: "#",           align: "left"  },
+                    { label: "Client",      align: "left"  },
+                    { label: "Type",        align: "left"  },
+                    { label: "Txn",         align: "right" },
+                    { label: "Gross",       align: "right" },
+                    { label: "Net",         align: "right", color: netColor  },
+                    { label: "Collected",   align: "right", color: collColor },
+                    { label: "Outstanding", align: "right", color: outColor  },
+                  ].map(h => (
+                    <TableCell key={h.label} align={h.align || "left"}
+                      sx={{ ...headerSx, color: h.color || "text.secondary" }}>
+                      {h.label}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {clientQ.isLoading
-                  ? [...Array(8)].map((_, i) => (
-                      <tr key={i}>
-                        {[...Array(8)].map((_, j) => (
-                          <td key={j}><Skeleton variant="text" /></td>
-                        ))}
-                      </tr>
-                    ))
+                  ? <SkeletonRows rows={8} cols={8} />
                   : topClients.length === 0
-                  ? (
-                      <tr>
-                        <td colSpan={8} style={{ textAlign:"center", padding:"32px 0", color:theme.palette.text.secondary }}>
-                          No data for selected period
-                        </td>
-                      </tr>
-                    )
+                  ? <EmptyRow cols={8} />
                   : topClients.map((c2, i) => (
-                      <tr key={c2.ClientID ?? i}>
-                        <td>
+                      <TableRow key={c2.ClientID ?? i} hover
+                        sx={{
+                          backgroundColor: i % 2 !== 0 ? "action.hover" : "transparent",
+                          "&:hover": { backgroundColor: "action.selected" },
+                        }}>
+                        <TableCell sx={{ ...cellSx, width: 48 }}>
                           <Box sx={{
-                            width:24, height:24, borderRadius:"50%",
-                            bgcolor:`${RANK_COLORS[i % RANK_COLORS.length]}22`,
-                            display:"flex", alignItems:"center", justifyContent:"center",
+                            width: 22, height: 22, borderRadius: "50%",
+                            bgcolor: alpha(RANK_COLORS[i % RANK_COLORS.length], 0.15),
+                            display: "flex", alignItems: "center", justifyContent: "center",
                           }}>
-                            <Typography sx={{ fontSize:"0.6rem", fontWeight:800, color:RANK_COLORS[i % RANK_COLORS.length] }}>
+                            <Typography sx={{ fontSize: "0.6rem", fontWeight: 800, color: RANK_COLORS[i % RANK_COLORS.length], lineHeight: 1 }}>
                               {i+1}
                             </Typography>
                           </Box>
-                        </td>
-                        <td style={{ fontWeight:600 }}>{c2.ClientName || c2.ClientID}</td>
-                        <td>
+                        </TableCell>
+                        <TableCell sx={{ ...cellSx, fontWeight: "bold" }}>{c2.ClientName || c2.ClientID}</TableCell>
+                        <TableCell sx={cellSx}>
                           {c2.ClientType
-                            ? (
-                                <Box component="span" sx={{
-                                  fontSize:"0.68rem", fontWeight:600, px:0.8, py:0.25, borderRadius:0.75,
-                                  bgcolor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
-                                  color:"text.secondary",
-                                }}>
-                                  {c2.ClientType}
-                                </Box>
-                              )
-                            : (
-                                <Typography component="span" sx={{ fontSize:"0.75rem", color:"text.disabled" }}>—</Typography>
-                              )
+                            ? <Chip label={c2.ClientType} size="small" variant="outlined" sx={{ fontSize: "0.68rem", height: 20 }} />
+                            : <Typography component="span" sx={{ fontSize: "0.78rem", color: "text.disabled" }}>—</Typography>
                           }
-                        </td>
-                        <td style={{ textAlign:"right" }}>{c2.TotalTransactions ?? 0}</td>
-                        {amtTd(c2.TotalGross,       null)}
-                        {amtTd(c2.TotalNet,         isDark ? "#d4a017" : "#7a6020", true)}
-                        {amtTd(c2.TotalCollected,   isDark ? "#5dade2" : "#1a5276")}
-                        {amtTd(c2.TotalOutstanding, isDark ? "#e08070" : "#7b1d14")}
-                      </tr>
+                        </TableCell>
+                        <TableCell align="right" sx={{ ...cellSx, color: "text.secondary" }}>{c2.TotalTransactions ?? 0}</TableCell>
+                        <TableCell align="right" sx={cellSx}>
+                          <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{fmt(c2.TotalGross)}</Typography>
+                        </TableCell>
+                        <TableCell align="right" sx={cellSx}>
+                          <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: "monospace", color: netColor }}>{fmt(c2.TotalNet)}</Typography>
+                        </TableCell>
+                        <TableCell align="right" sx={cellSx}>
+                          <Typography variant="body2" sx={{ fontFamily: "monospace", color: collColor }}>{fmt(c2.TotalCollected)}</Typography>
+                        </TableCell>
+                        <TableCell align="right" sx={cellSx}>
+                          <Typography variant="body2" sx={{ fontFamily: "monospace", color: outColor }}>{fmt(c2.TotalOutstanding)}</Typography>
+                        </TableCell>
+                      </TableRow>
                     ))
                 }
-              </tbody>
-            </Box>
-          </Box>
+              </TableBody>
+            </Table>
+          </TableContainer>
         )}
-      </Box>
+
+      </Paper>
     </Box>
   );
 };
