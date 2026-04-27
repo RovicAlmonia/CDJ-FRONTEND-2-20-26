@@ -1,0 +1,109 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Poetsen+One&family=Roboto+Slab&display=swap');
+@import '../../../node_modules/react-perfect-scrollbar/dist/css/styles.css';
+
+
+.scrollbar-container .ps__rail-y:hover > .ps__thumb-y,
+.scrollbar-container .ps__rail-y:focus > .ps__thumb-y,
+.scrollbar-container .ps__rail-y.ps--clicking .ps__thumb-y {
+  background-color: 'grey';
+  width: 5px;
+}
+
+.scrollbar-container .ps__thumb-y {
+  background-color: 'grey';
+  border-radius: 6px;
+  width: 5px;
+  right: 0;
+}
+
+.scrollbar-container.ps.ps--active-y > .ps__rail-y {
+  width: 5px;
+  background-color: transparent !important;
+  z-index: 999;
+}
+
+.scrollbar-container.ps.ps--active-y > .ps__rail-y:hover,
+.scrollbar-container.ps.ps--active-y > .ps__rail-y.ps--clicking {
+  width: 5px;
+  background-color: transparent;
+}
+
+.scrollbar-container.ps.ps--scrolling-y > .ps__rail-y,
+.scrollbar-container.ps.ps--scrolling-x > .ps__rail-x {
+  opacity: 0.4;
+  background-color: transparent;
+}
+
+.rotateIcon {
+  animation: spin 10s linear infinite;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 90vh;
+}
+
+.upload-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.image-preview-container:hover .upload-text {
+  opacity: 1;
+}
+
+
+.component-image-wrapper {
+  width: 100%;
+  height: 100%;
+  vertical-align: bottom;
+  background-size: cover !important;
+}
+
+.lazy-load-image-background .blur .lazy-load-image-loaded {
+  filter: blur(0);
+  transition: filter .3s;
+}
+
+.wrapper-bg {
+  position: fixed;
+  background-color: rgba(0, 0, 0, 0.9);
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 2000;
+}
+
+.wrapper-bg h2 {
+  font-size: 300%;
+  margin-top: 20% !important;
+}
+
+.duplicate-row {
+  background-color: rgba(255, 0, 0, 0.2) !important; /* Light red */
+  color: red !important;
+}
+
+::-webkit-scrollbar {
+  -webkit-appearance: none;
+  width: 15px;
+  background-color: rgb(33,43,54);
+
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: grey;
+}
+
